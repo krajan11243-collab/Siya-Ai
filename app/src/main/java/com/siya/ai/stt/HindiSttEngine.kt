@@ -8,10 +8,7 @@ import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineStream
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * High-quality offline Hindi ASR engine using sherpa-onnx + IndicConformer CTC.
- * Inference is fully local once the model files have been installed.
- */
+/** High-quality offline Hindi ASR using sherpa-onnx + IndicConformer CTC. */
 class HindiSttEngine(
     private val modelStore: SttModelStore,
     private val config: SttConfig = SttConfig(),
@@ -43,14 +40,11 @@ class HindiSttEngine(
     fun transcribe(pcm16: ShortArray, length: Int = pcm16.size): SttResult {
         check(!closed.get()) { "HindiSttEngine is closed" }
         require(length in 1..pcm16.size) { "Invalid PCM length" }
-
-        val samples = FloatArray(length)
-        for (i in 0 until length) samples[i] = pcm16[i] / 32768f
-
+        val samples = FloatArray(length) { pcm16[it] / 32768f }
         val stream: OfflineStream = recognizer.createStream()
         return try {
+            // OfflineStream accepts the complete utterance once; no inputFinished() is needed.
             stream.acceptWaveform(samples, config.sampleRate)
-            stream.inputFinished()
             recognizer.decode(stream)
             val result = recognizer.getResult(stream)
             SttResult(
