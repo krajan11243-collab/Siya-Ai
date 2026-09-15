@@ -6,31 +6,52 @@ import ai.onnxruntime.OrtSession
 import java.nio.FloatBuffer
 
 /**
- * Silero VAD v5 ONNX streaming wrapper.
- * v5 uses 512 samples at 16 kHz plus 64 samples of previous context.
+ * Silero VAD v5 ONNX streaming wrapper for 16 kHz mono PCM16.
+ * A 512-sample audio window is combined with 64 samples of rolling context.
  */
 class SileroVadEngine(
     private val modelBytes: ByteArray,
     private val config: VadConfig = VadConfig()
 ) : AutoCloseable {
     private val environment = OrtEnvironment.getEnvironment()
-    private val session: OrtSession = environment.createSession(modelBytes, OrtSession.SessionOptions())
+    private val session: OrtSession
     private val state = FloatArray(2 * 128)
     private val context = FloatArray(config.contextSamples)
     private val machine = SpeechStateMachine(config)
+    private var closed = false
 
     init {
         require(modelBytes.isNotEmpty()) { "Silero VAD model is empty" }
+        val options = OrtSession.SessionOptions().apply {
+            setInterOpNumThreads(1)
+            setIntraOpNumThreads(1)
+            setLogSeverityLevel(3)
+        }
+        session = try {
+            environment.createSession(modelBytes, options)
+        } catch (t: Throwable) {
+            options.close()
+            throw IllegalArgumentException("Unable to load Silero VAD ONNX model", t)
+        } finally {
+            // The session keeps the required native state after creation.
+            options.close()
+        }
     }
 
+    @Synchronized
     fun reset() {
+        check(!closed) { "VAD engine is closed" }
         java.util.Arrays.fill(state, 0f)
         java.util.Arrays.fill(context, 0f)
         machine.reset()
     }
 
+    @Synchronized
     fun process(pcm16: ShortArray, length: Int = pcm16.size): VadFrameResult {
-        require(length == config.windowSamples) { "Silero v5 requires exactly 512 samples at 16 kHz" }
+        check(!closed) { "VAD engine is closed" }
+        require(length == config.windowSamples) {
+            "Silero v5 requires exactly ${config.windowSamples} samples at ${config.sampleRate} Hz"
+        }
         require(length <= pcm16.size)
 
         val input = FloatArray(config.contextSamples + config.windowSamples)
@@ -47,14 +68,18 @@ class SileroVadEngine(
             FloatBuffer.wrap(state),
             longArrayOf(2, 1, 128)
         )
-        val sampleRateTensor = OnnxTensor.createTensor(environment, longArrayOf(config.sampleRate.toLong()))
+        val sampleRateTensor = OnnxTensor.createTensor(
+            environment,
+            longArrayOf(config.sampleRate.toLong()),
+            longArrayOf(1)
+        )
 
         try {
             val inputs = mapOf("input" to inputTensor, "state" to stateTensor, "sr" to sampleRateTensor)
             session.run(inputs).use { result ->
+                require(result.size() >= 2) { "Silero VAD returned fewer than 2 outputs" }
                 val probability = firstFloat(result[0].value)
-                val nextState = result[1].value as Array<*>
-                flattenState(nextState, state)
+                flattenState(result[1].value, state)
                 System.arraycopy(input, input.size - context.size, context, 0, context.size)
                 return machine.accept(probability, length)
             }
@@ -66,25 +91,33 @@ class SileroVadEngine(
     }
 
     private fun firstFloat(value: Any?): Float = when (value) {
-        is FloatArray -> value.first()
+        is FloatArray -> value.firstOrNull() ?: error("Silero output is empty")
         is Array<*> -> firstFloat(value.firstOrNull())
         else -> error("Unexpected Silero output type: ${value?.javaClass}")
-    }
+    }.coerceIn(0f, 1f)
 
-    private fun flattenState(value: Array<*>, target: FloatArray) {
+    private fun flattenState(value: Any?, target: FloatArray) {
         var index = 0
         fun visit(v: Any?) {
             when (v) {
-                is FloatArray -> for (x in v) target[index++] = x
+                is FloatArray -> {
+                    for (x in v) {
+                        require(index < target.size) { "Silero state output is too large" }
+                        target[index++] = x
+                    }
+                }
                 is Array<*> -> for (child in v) visit(child)
-                else -> error("Unexpected Silero state type: ${v?.javaClass}")
+                else -> error("Unexpected Silero state output type: ${v?.javaClass}")
             }
         }
         visit(value)
         require(index == target.size) { "Unexpected Silero state size: $index" }
     }
 
+    @Synchronized
     override fun close() {
+        if (closed) return
+        closed = true
         session.close()
     }
 }
