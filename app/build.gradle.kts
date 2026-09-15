@@ -33,6 +33,12 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        jniLibs {
+            pickFirsts += "lib/arm64-v8a/libonnxruntime.so"
+            pickFirsts += "lib/armeabi-v7a/libonnxruntime.so"
+            pickFirsts += "lib/x86/libonnxruntime.so"
+            pickFirsts += "lib/x86_64/libonnxruntime.so"
+        }
     }
 }
 
