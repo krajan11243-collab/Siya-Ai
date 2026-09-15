@@ -11,10 +11,14 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.siya.ai.audio.AudioEngine
 import com.siya.ai.R
+import com.siya.ai.audio.AudioEngine
+import com.siya.ai.vad.SileroVadEngine
+import com.siya.ai.vad.VadModelStore
+import com.siya.ai.vad.VadPcmProcessor
+import com.siya.ai.vad.VadState
 
-/** Foreground microphone host for the on-device voice pipeline. */
+/** Foreground microphone host for the local audio + optional VAD pipeline. */
 class SiyaVoiceService : Service() {
     companion object {
         private const val CHANNEL_ID = "siya_voice"
@@ -22,11 +26,14 @@ class SiyaVoiceService : Service() {
     }
 
     private var audioEngine: AudioEngine? = null
+    private var vad: SileroVadEngine? = null
+    private var vadProcessor: VadPcmProcessor? = null
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Audio engine starting"))
+        initializeVadIfInstalled()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -36,19 +43,46 @@ class SiyaVoiceService : Service() {
         }
         if (audioEngine?.isRunning() == true) return START_STICKY
 
-        val engine = audioEngine ?: AudioEngine(this).also { audioEngine = it }
+        val engine = audioEngine ?: AudioEngine(this, onPcm = ::onPcm).also { audioEngine = it }
         if (!engine.start()) {
             updateNotification("Microphone unavailable")
             stopSelf()
             return START_NOT_STICKY
         }
-        updateNotification("Microphone active • 16 kHz PCM")
+        updateNotification(if (vad != null) "Microphone + VAD active" else "Microphone active • VAD model not installed")
         return START_STICKY
+    }
+
+    private fun initializeVadIfInstalled() {
+        val store = VadModelStore(this)
+        if (!store.isInstalled()) return
+        runCatching {
+            val engine = SileroVadEngine(store.readBytes())
+            vad = engine
+            vadProcessor = VadPcmProcessor(engine)
+        }.onFailure {
+            vad?.close()
+            vad = null
+            vadProcessor = null
+        }
+    }
+
+    private fun onPcm(buffer: ShortArray, length: Int) {
+        vadProcessor?.accept(buffer, length) { result ->
+            when (result.event?.type) {
+                com.siya.ai.vad.VadEventType.SPEECH_START -> updateNotification("Speech detected • Siya Ai ready")
+                com.siya.ai.vad.VadEventType.SPEECH_END -> updateNotification("Listening idle • waiting for speech")
+                null -> if (result.state == VadState.ENDING) Unit
+            }
+        }
     }
 
     override fun onDestroy() {
         audioEngine?.release()
         audioEngine = null
+        vadProcessor = null
+        vad?.close()
+        vad = null
         super.onDestroy()
     }
 
