@@ -13,7 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import com.siya.ai.service.SiyaVoiceService
-import com.siya.ai.ui.SiyaApp
+import com.siya.ai.ui.SiyaProApp
 
 class MainActivity : ComponentActivity() {
     private var microphoneGranted by mutableStateOf(false)
@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
 
         setContent {
-            SiyaApp(
+            SiyaProApp(
                 microphoneGranted = microphoneGranted,
                 onRequestPermissions = ::requestRequiredPermissions,
                 onStartVoice = ::startVoiceService,
@@ -50,8 +50,10 @@ class MainActivity : ComponentActivity() {
 
     private fun startVoiceService() {
         if (!microphoneGranted) return
-        val intent = Intent(this, SiyaVoiceService::class.java)
-        ContextCompat.startForegroundService(this, intent)
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, SiyaVoiceService::class.java)
+        )
     }
 
     private fun stopVoiceService() {
