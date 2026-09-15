@@ -2,6 +2,7 @@ package com.siya.ai.llm
 
 import dev.ffmpegkit.llama.Llama
 import dev.ffmpegkit.llama.LlamaConfig
+import dev.ffmpegkit.llama.LlamaModel
 import java.util.concurrent.atomic.AtomicBoolean
 
 class LocalLlmEngine(
@@ -9,7 +10,7 @@ class LocalLlmEngine(
     private val config: LlmConfig = LlmConfig(),
 ) : AutoCloseable {
     private val closed = AtomicBoolean(false)
-    private var model: Any? = null
+    private var model: LlamaModel? = null
 
     suspend fun load() {
         check(!closed.get()) { "LocalLlmEngine is closed" }
@@ -20,6 +21,10 @@ class LocalLlmEngine(
             config = LlamaConfig(
                 contextSize = config.contextSize,
                 threads = config.threads,
+                gpuLayers = 0,
+                temperature = config.temperature,
+                topP = config.topP,
+                topK = 40,
             ),
         )
     }
@@ -45,11 +50,8 @@ class LocalLlmEngine(
 
     override fun close() {
         if (closed.compareAndSet(false, true)) {
-            val loaded = model
+            model?.let(Llama::releaseModel)
             model = null
-            if (loaded != null) {
-                Llama.releaseModel(loaded)
-            }
         }
     }
 
