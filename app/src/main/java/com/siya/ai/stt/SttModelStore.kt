@@ -4,7 +4,7 @@ import android.content.Context
 import java.io.File
 
 /**
- * Local-only ASR model storage. No network access is performed here.
+ * Local-only ASR model storage.
  *
  * Expected layout:
  * files/models/asr/hi/model.int8.onnx
@@ -15,8 +15,8 @@ class SttModelStore(context: Context) {
         const val LANGUAGE_HI = "hi"
         const val MODEL_FILE = "model.int8.onnx"
         const val TOKENS_FILE = "tokens.txt"
-        private const val MIN_MODEL_BYTES = 10_000_000L
-        private const val MIN_TOKENS_BYTES = 1_000L
+        private const val MIN_MODEL_BYTES = 100_000_000L
+        private const val MIN_TOKENS_BYTES = 10_000L
     }
 
     private val root = File(context.filesDir, "models/asr/$LANGUAGE_HI").apply { mkdirs() }
@@ -24,9 +24,7 @@ class SttModelStore(context: Context) {
     val modelFile: File get() = File(root, MODEL_FILE)
     val tokensFile: File get() = File(root, TOKENS_FILE)
 
-    fun isInstalled(): Boolean =
-        modelFile.isFile && modelFile.length() >= MIN_MODEL_BYTES &&
-            tokensFile.isFile && tokensFile.length() >= MIN_TOKENS_BYTES
+    fun isInstalled(): Boolean = validate().isSuccess
 
     fun validate(): Result<Unit> = runCatching {
         require(modelFile.isFile) { "Hindi STT model is missing" }
