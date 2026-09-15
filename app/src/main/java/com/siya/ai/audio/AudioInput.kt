@@ -29,40 +29,56 @@ class AudioInput(
 
         val minBytes = AudioRecord.getMinBufferSize(config.sampleRate, config.channelMask, config.encoding)
         if (minBytes <= 0) return false
-        val bufferBytes = maxOf(minBytes, config.sampleRate * config.bytesPerSample / 5)
-        val created = try {
-            AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, config.sampleRate, config.channelMask, config.encoding, bufferBytes)
+
+        // Keep enough headroom for scheduler jitter while staying latency-friendly.
+        val targetBytes = config.sampleRate * config.bytesPerSample / 5
+        val bufferBytes = maxOf(minBytes, targetBytes)
+        val created = createRecorder(bufferBytes) ?: return false
+
+        try {
+            created.startRecording()
+            if (created.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                created.release()
+                return false
+            }
         } catch (_: Exception) {
-            try { AudioRecord(MediaRecorder.AudioSource.MIC, config.sampleRate, config.channelMask, config.encoding, bufferBytes) } catch (_: Exception) { null }
-        }
-        if (created == null || created.state != AudioRecord.STATE_INITIALIZED) {
-            created?.release()
+            created.release()
             return false
         }
 
         recorder = created
         effects?.attach(created)
         running.set(true)
+
         worker = Thread {
-            val samples = ShortArray(bufferBytes / config.bytesPerSample)
+            val samples = ShortArray(maxOf(1, bufferBytes / config.bytesPerSample))
             try {
-                created.startRecording()
-                if (created.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
-                    running.set(false)
-                    return@Thread
-                }
-                while (running.get()) {
+                while (running.get() && !Thread.currentThread().isInterrupted) {
                     val count = created.read(samples, 0, samples.size, AudioRecord.READ_BLOCKING)
                     when {
                         count > 0 -> listener.onAudio(samples, count, System.nanoTime())
-                        count == AudioRecord.ERROR_DEAD_OBJECT || count == AudioRecord.ERROR_INVALID_OPERATION -> break
+                        count == AudioRecord.ERROR_DEAD_OBJECT -> {
+                            running.set(false)
+                            break
+                        }
+                        count == AudioRecord.ERROR_INVALID_OPERATION -> {
+                            running.set(false)
+                            break
+                        }
+                        count < 0 -> {
+                            // Unknown read failure: stop rather than spin at 100% CPU.
+                            running.set(false)
+                            break
+                        }
                     }
                 }
             } catch (_: SecurityException) {
-                // Permission may be revoked while the service is alive.
-            } finally {
                 running.set(false)
+            } catch (_: IllegalStateException) {
+                running.set(false)
+            } finally {
                 try { created.stop() } catch (_: Exception) { }
+                running.set(false)
             }
         }.apply {
             name = "Siya-AudioInput"
@@ -72,11 +88,28 @@ class AudioInput(
         return true
     }
 
+    private fun createRecorder(bufferBytes: Int): AudioRecord? {
+        val sources = intArrayOf(
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.MIC
+        )
+        for (source in sources) {
+            val candidate = try {
+                AudioRecord(source, config.sampleRate, config.channelMask, config.encoding, bufferBytes)
+            } catch (_: Exception) {
+                null
+            }
+            if (candidate?.state == AudioRecord.STATE_INITIALIZED) return candidate
+            candidate?.release()
+        }
+        return null
+    }
+
     fun stop() {
-        if (!running.getAndSet(false)) return
+        running.set(false)
         worker?.interrupt()
         try { recorder?.stop() } catch (_: Exception) { }
-        worker?.join(500)
+        worker?.join(750)
         worker = null
     }
 
