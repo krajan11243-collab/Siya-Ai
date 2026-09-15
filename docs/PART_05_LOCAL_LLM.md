@@ -1,91 +1,70 @@
-# Siya Ai — Part 5: Local LLM Brain
+# Part 5 — Local LLM Brain
 
 ## Goal
 
-Add the local reasoning layer for Siya Ai without making the Android UI or voice service depend directly on native inference code.
-
-## Current implementation
-
-- `LlamaJni.kt`: isolated JNI boundary for the native `siya_llama` library.
-- `LlmConfig.kt`: mobile-safe runtime configuration (context, threads, max tokens, temperature).
-- `PromptFormatter.kt`: Siya system prompt and chat-template boundary.
-- `LocalLlmEngine.kt`: lifecycle-safe facade for load → generate → cancel → unload.
-- `LocalModelManager.kt`: private model directory and Qwen GGUF path management.
+Connect Hindi STT output to a fully on-device Qwen instruct model through llama.cpp. No API key or cloud inference is required after the model is installed.
 
 ## Model
 
-Target model: a compatible Qwen 2.5 1.5B Instruct GGUF quantization, initially Q4_K_M as specified by the master plan.
+- Model: Qwen2.5 1.5B Instruct
+- Quantization: Q4_K_M
+- Format: GGUF
+- Source: `Qwen/Qwen2.5-1.5B-Instruct-GGUF`
+- File: `qwen2.5-1.5b-instruct-q4_k_m.gguf`
+- Expected size: about 1.12 GB
+- SHA-256 is pinned in `LlmModelStore`
 
-Large model binaries are intentionally **not committed to Git**. They should be installed through a model-pack/import workflow.
+The large GGUF is intentionally not committed to Git.
 
-Expected local path:
+## Runtime
 
-```text
-<app filesDir>/models/llm/qwen2.5-1.5b-instruct-q4_k_m.gguf
-```
+The Android app uses `dev.ffmpegkit-maintained:llama-android:0.1.1`, a prebuilt llama.cpp Android AAR. The current configuration uses CPU/NEON with `gpuLayers = 0`; GPU acceleration is not claimed until it is separately verified on target hardware.
 
-## Native engine
+## Files
 
-The JNI boundary expects a native library named:
+- `LlmConfig.kt` — conservative mobile context/thread/generation settings.
+- `LlmModelStore.kt` — app-private model location and integrity contract.
+- `LlmModelInstaller.kt` — first-install download, temporary file, size check, SHA-256 check, atomic rename.
+- `LocalLlmEngine.kt` — load/complete/release facade over llama.cpp.
+- `LlmExecutor.kt` — serializes local inference because one model session is not thread-safe.
 
-```text
-libsiya_llama.so
-```
+## Pipeline
 
-That library will wrap llama.cpp and expose four operations:
+`AudioRecord → Silero VAD → complete speech segment → Hindi Sherpa-ONNX STT → Qwen2.5 local LLM`
 
-1. create(modelPath, contextSize, threads)
-2. generate(handle, prompt, maxTokens, temperature)
-3. cancel(handle)
-4. destroy(handle)
+The voice service now forwards successful Hindi STT text to `LlmExecutor`.
 
-The Android layer currently treats the native library as optional, so the project can still compile before the llama.cpp source and ABI builds are integrated.
+## Network boundary
 
-## Lifecycle
-
-```text
-MODEL MISSING
-     ↓ model imported
-READY
-     ↓ load()
-LOADED
-     ↓ generate()
-GENERATING
-     ↓ complete
-LOADED
-     ↓ unload()
-READY
-```
-
-`cancel()` must stop generation before TTS barge-in handling proceeds. `unload()` releases the native handle and should be called when the resource manager decides the heavy model is no longer needed.
+`INTERNET` is present only because the first-time model installer downloads the GGUF. Once the model is installed, llama.cpp loads it from the app-private filesystem and inference does not require network access.
 
 ## Memory policy
 
-The master plan's RAM numbers are targets, not guarantees. Actual RSS depends on quantization, context size, allocator, native backend, CPU/GPU offload and device RAM.
-
-Initial mobile defaults:
+Defaults:
 
 - context: 2048 tokens
-- threads: 4
+- CPU threads: 4
 - max output: 256 tokens
 - temperature: 0.7
+- top-p: 0.9
+- GPU layers: 0
 
-These are intentionally conservative and will be benchmarked on real hardware.
+The Q4_K_M file is about 1.12 GB, but runtime RAM usage is device-dependent. These values must be benchmarked on real phones before production tuning.
 
-## Streaming follow-up
+## Verification status
 
-The current JNI contract returns a complete string so Part 5 can establish a stable engine boundary first. Part 7 will extend this contract with token callbacks/streaming so the first response chunks can reach the TTS layer without waiting for the full answer.
+**Code integration: implemented.**
 
-## Acceptance tests
+**Full verification: pending.** The repository has not yet been successfully built and a real Android device has not yet loaded the GGUF and generated a response. Therefore Part 5 is not marked production-verified.
 
-- App remains buildable when native engine is absent.
-- Missing model produces a controlled `ModelMissing` state.
-- Invalid native handle never reaches generation.
-- `cancel()` is safe before/after generation.
-- `unload()` is idempotent.
-- No model content is written to logs.
-- Airplane mode does not affect the local LLM path after the model is installed.
+## Next gate
 
-## Next step
+Before Part 6, build the complete app and test:
 
-Part 5's next implementation step is the actual llama.cpp Android/NDK bridge and ABI builds. After that, integrate the engine into the voice service only after native load/generate/unload tests pass.
+1. APK/Gradle build.
+2. Model installation and SHA-256 verification.
+3. Qwen model load.
+4. Hindi STT text → Qwen response.
+5. Model release without crash.
+
+Only after these pass should Part 6 begin.
