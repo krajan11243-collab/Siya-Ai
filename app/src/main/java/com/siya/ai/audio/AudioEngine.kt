@@ -4,15 +4,14 @@ import android.content.Context
 import java.util.concurrent.atomic.AtomicBoolean
 
 class AudioEngine(context: Context, private val config: AudioEngineConfig = AudioEngineConfig()) {
-    private val input = AudioInput(context, config)
-    private val output = AudioOutput(config)
     private val effects = AudioEffectsController()
+    private val input = AudioInput(context, config, effects)
+    private val output = AudioOutput(config)
     private val focus = AudioFocusController(context)
     private val running = AtomicBoolean(false)
 
     @Volatile var lastRms: Float = 0f
         private set
-
     @Volatile var lastPeak: Float = 0f
         private set
 
@@ -33,7 +32,6 @@ class AudioEngine(context: Context, private val config: AudioEngineConfig = Audi
             }
             lastRms = if (length == 0) 0f else (kotlin.math.sqrt(sum / length) / Short.MAX_VALUE).toFloat()
             lastPeak = peak.toFloat() / Short.MAX_VALUE
-            // Part 2 intentionally does not log or persist raw microphone PCM.
         })
         if (!started) {
             output.release()
@@ -54,7 +52,7 @@ class AudioEngine(context: Context, private val config: AudioEngineConfig = Audi
     }
 
     fun release() {
-        stop()
+        running.set(false)
         input.release()
         output.release()
         effects.release()
