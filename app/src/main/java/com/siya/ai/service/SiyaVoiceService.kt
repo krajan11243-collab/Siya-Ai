@@ -8,6 +8,8 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -28,12 +30,14 @@ class SiyaVoiceService : Service() {
     private var audioEngine: AudioEngine? = null
     private var vad: SileroVadEngine? = null
     private var vadProcessor: VadPcmProcessor? = null
+    private var vadThread: HandlerThread? = null
+    private var vadHandler: Handler? = null
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Audio engine starting"))
-        initializeVadIfInstalled()
+        startVadWorker()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -49,8 +53,16 @@ class SiyaVoiceService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        updateNotification(if (vad != null) "Microphone + VAD active" else "Microphone active • VAD model not installed")
+        updateNotification(if (vad != null) "Microphone + VAD active" else "Microphone active • VAD loading/not installed")
         return START_STICKY
+    }
+
+    private fun startVadWorker() {
+        val thread = HandlerThread("Siya-VAD", Thread.NORM_PRIORITY).apply { start() }
+        vadThread = thread
+        val handler = Handler(thread.looper)
+        vadHandler = handler
+        handler.post { initializeVadIfInstalled() }
     }
 
     private fun initializeVadIfInstalled() {
@@ -68,11 +80,23 @@ class SiyaVoiceService : Service() {
     }
 
     private fun onPcm(buffer: ShortArray, length: Int) {
-        vadProcessor?.accept(buffer, length) { result ->
-            when (result.event?.type) {
-                com.siya.ai.vad.VadEventType.SPEECH_START -> updateNotification("Speech detected • Siya Ai ready")
-                com.siya.ai.vad.VadEventType.SPEECH_END -> updateNotification("Listening idle • waiting for speech")
-                null -> if (result.state == VadState.ENDING) Unit
+        val handler = vadHandler ?: return
+        if (length <= 0) return
+        // AudioInput reuses its capture buffer, so never hand that mutable array to another thread.
+        val copy = buffer.copyOf(length)
+        handler.post {
+            val processor = vadProcessor ?: return@post
+            runCatching {
+                processor.accept(copy, copy.size) { result ->
+                    when (result.event?.type) {
+                        com.siya.ai.vad.VadEventType.SPEECH_START -> updateNotification("Speech detected • Siya Ai ready")
+                        com.siya.ai.vad.VadEventType.SPEECH_END -> updateNotification("Listening idle • waiting for speech")
+                        null -> if (result.state == VadState.ENDING) Unit
+                    }
+                }
+            }.onFailure {
+                // A malformed model must not terminate the microphone service.
+                updateNotification("VAD error • microphone still active")
             }
         }
     }
@@ -80,6 +104,10 @@ class SiyaVoiceService : Service() {
     override fun onDestroy() {
         audioEngine?.release()
         audioEngine = null
+        vadHandler?.removeCallbacksAndMessages(null)
+        vadThread?.quitSafely()
+        vadHandler = null
+        vadThread = null
         vadProcessor = null
         vad?.close()
         vad = null
