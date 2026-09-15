@@ -46,8 +46,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.29.0")
 
-    // Part 4: official sherpa-onnx Android/JVM API and native runtime.
+    // Part 4: Hindi offline ASR.
     implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8")
+
+    // Part 5: llama.cpp GGUF inference. CPU/NEON, arm64-v8a.
+    implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
 
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
