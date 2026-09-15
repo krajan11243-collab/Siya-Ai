@@ -3,7 +3,11 @@ package com.siya.ai.audio
 import android.content.Context
 import java.util.concurrent.atomic.AtomicBoolean
 
-class AudioEngine(context: Context, private val config: AudioEngineConfig = AudioEngineConfig()) {
+class AudioEngine(
+    context: Context,
+    private val config: AudioEngineConfig = AudioEngineConfig(),
+    private val onPcm: ((ShortArray, Int) -> Unit)? = null
+) {
     private val effects = AudioEffectsController()
     private val input = AudioInput(context, config, effects)
     private val output = AudioOutput(config)
@@ -32,6 +36,7 @@ class AudioEngine(context: Context, private val config: AudioEngineConfig = Audi
             }
             lastRms = if (length == 0) 0f else (kotlin.math.sqrt(sum / length) / Short.MAX_VALUE).toFloat()
             lastPeak = peak.toFloat() / Short.MAX_VALUE
+            onPcm?.invoke(pcm, length)
         })
         if (!started) {
             output.release()
