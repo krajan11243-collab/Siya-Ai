@@ -12,9 +12,10 @@ class LocalLlmEngine(
     private val closed = AtomicBoolean(false)
     private var model: LlamaModel? = null
 
+    /** Loads the GGUF model once and safely reuses it for later chat turns. */
     suspend fun load() {
         check(!closed.get()) { "LocalLlmEngine is closed" }
-        check(model == null) { "Qwen model is already loaded" }
+        if (model != null) return
         modelStore.validate().getOrThrow()
         model = Llama.loadModel(
             modelPath = modelStore.modelPath(),
@@ -35,17 +36,15 @@ class LocalLlmEngine(
     ): LlmResult {
         check(!closed.get()) { "LocalLlmEngine is closed" }
         require(prompt.isNotBlank())
-        val loaded = model ?: error("Qwen model is not loaded")
+        load()
+        val loaded = model ?: error("Qwen model could not be loaded")
         val result = Llama.complete(
             loaded,
             prompt = prompt,
             systemPrompt = systemPrompt,
             maxTokens = config.maxTokens,
         )
-        return LlmResult(
-            text = result.text.trim(),
-            tokensPerSecond = result.tokensPerSecond,
-        )
+        return LlmResult(text = result.text.trim(), tokensPerSecond = result.tokensPerSecond)
     }
 
     override fun close() {
