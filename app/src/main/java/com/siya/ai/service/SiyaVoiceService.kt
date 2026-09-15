@@ -15,6 +15,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.siya.ai.R
 import com.siya.ai.audio.AudioEngine
+import com.siya.ai.llm.LlmExecutor
+import com.siya.ai.llm.LlmModelStore
+import com.siya.ai.llm.LocalLlmEngine
 import com.siya.ai.stt.HindiSttEngine
 import com.siya.ai.stt.SttExecutor
 import com.siya.ai.stt.SttModelStore
@@ -24,7 +27,7 @@ import com.siya.ai.vad.VadModelStore
 import com.siya.ai.vad.VadPcmProcessor
 import com.siya.ai.vad.VadState
 
-/** Foreground microphone host for local audio + VAD + Hindi STT. */
+/** Foreground microphone host for local audio + VAD + Hindi STT + local LLM. */
 class SiyaVoiceService : Service() {
     companion object {
         private const val CHANNEL_ID = "siya_voice"
@@ -38,11 +41,13 @@ class SiyaVoiceService : Service() {
     private var vadHandler: Handler? = null
     private var sttExecutor: SttExecutor? = null
     private var sttPipeline: SttPipeline? = null
+    private var llmExecutor: LlmExecutor? = null
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Audio engine starting"))
+        initializeLlmIfInstalled()
         initializeSttIfInstalled()
         startVadWorker()
     }
@@ -62,12 +67,31 @@ class SiyaVoiceService : Service() {
         }
         updateNotification(
             when {
-                vad != null && sttPipeline != null -> "Microphone + VAD + Hindi STT active"
-                vad != null -> "Microphone + VAD active • STT model not installed"
-                else -> "Microphone active • VAD/STT model not installed"
+                vad != null && sttPipeline != null && llmExecutor != null -> "Microphone + VAD + Hindi STT + local AI active"
+                vad != null && sttPipeline != null -> "Microphone + VAD + Hindi STT active • LLM not installed"
+                vad != null -> "Microphone + VAD active • STT/LLM model not installed"
+                else -> "Microphone active • VAD/STT/LLM model not installed"
             }
         )
         return START_STICKY
+    }
+
+    private fun initializeLlmIfInstalled() {
+        val store = LlmModelStore(this)
+        if (!store.isInstalled()) return
+        llmExecutor = LlmExecutor(
+            engineFactory = { LocalLlmEngine(store) },
+        ) { result ->
+            result.onSuccess { answer ->
+                if (answer.text.isNotBlank()) {
+                    updateNotification("Siya: ${answer.text.take(120)}")
+                } else {
+                    updateNotification("Siya local AI returned empty text")
+                }
+            }.onFailure {
+                updateNotification("Local AI error • microphone still active")
+            }
+        }
     }
 
     private fun initializeSttIfInstalled() {
@@ -78,8 +102,12 @@ class SiyaVoiceService : Service() {
             sttExecutor = executor
             sttPipeline = SttPipeline(executor) { result ->
                 result.onSuccess { stt ->
-                    if (stt.text.isNotBlank()) updateNotification("Hindi: ${stt.text.take(80)}")
-                    else updateNotification("Hindi STT returned empty text")
+                    if (stt.text.isNotBlank()) {
+                        updateNotification("Hindi: ${stt.text.take(80)}")
+                        llmExecutor?.submit(stt.text)
+                    } else {
+                        updateNotification("Hindi STT returned empty text")
+                    }
                 }.onFailure {
                     updateNotification("Hindi STT error • microphone still active")
                 }
@@ -115,7 +143,6 @@ class SiyaVoiceService : Service() {
 
     private fun onPcm(buffer: ShortArray, length: Int) {
         if (length <= 0) return
-        // Feed STT's bounded pre-roll buffer before VAD publishes its decision.
         sttPipeline?.onAudio(buffer, length)
 
         val handler = vadHandler ?: return
@@ -142,6 +169,8 @@ class SiyaVoiceService : Service() {
         sttPipeline = null
         sttExecutor?.close()
         sttExecutor = null
+        llmExecutor?.close()
+        llmExecutor = null
         audioEngine?.release()
         audioEngine = null
         vadHandler?.removeCallbacksAndMessages(null)
