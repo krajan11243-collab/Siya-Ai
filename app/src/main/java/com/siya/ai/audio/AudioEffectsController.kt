@@ -1,8 +1,8 @@
 package com.siya.ai.audio
 
-import android.media.AcousticEchoCanceler
 import android.media.AudioRecord
-import android.media.NoiseSuppressor
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
 
 /** Device-capability wrapper; effects are optional and never assumed to exist. */
 class AudioEffectsController {
