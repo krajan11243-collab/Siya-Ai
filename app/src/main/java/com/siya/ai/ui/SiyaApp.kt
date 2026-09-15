@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,9 +71,7 @@ private fun HomeScreen(
             }
             IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Settings", tint = Color.White) }
         }
-
         Spacer(Modifier.height(24.dp))
-
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = SiyaPanel)) {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(if (running) "Listening" else "Ready when you are", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
@@ -86,14 +85,11 @@ private fun HomeScreen(
                 Text(if (running) "Tap to stop" else "Tap to talk", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
-
         Spacer(Modifier.height(16.dp))
-
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatusCard("OFFLINE", "Local-first", Modifier.weight(1f))
             StatusCard("MIC", if (microphoneGranted) "Ready" else "Required", Modifier.weight(1f))
         }
-
         Spacer(Modifier.height(16.dp))
         Card(onClick = onModels, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = SiyaPanel)) {
             Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -103,7 +99,6 @@ private fun HomeScreen(
                 Icon(Icons.Default.ChevronRight, null, tint = SiyaTextMuted)
             }
         }
-
         Spacer(Modifier.weight(1f))
         if (!microphoneGranted) {
             Button(onClick = onRequestPermissions, Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(17.dp)) { Text("Allow Microphone", fontWeight = FontWeight.Bold) }
