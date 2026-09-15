@@ -23,3 +23,5 @@ jobs:
           gradle-version: '8.9'
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --no-daemon
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --no-daemon
