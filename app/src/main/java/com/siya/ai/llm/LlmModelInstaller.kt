@@ -14,23 +14,47 @@ class LlmModelInstaller(private val store: LlmModelStore) {
     suspend fun download(onProgress: (Long, Long) -> Unit = { _, _ -> }) = withContext(Dispatchers.IO) {
         val target = store.modelFile
         val temp = File(target.parentFile, "${target.name}.download")
-        val connection = (URL(LlmModelStore.MODEL_URL).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 20_000
-            readTimeout = 60_000
-            requestMethod = "GET"
-            instanceFollowRedirects = true
-        }
-
+        var existing = if (temp.isFile) temp.length() else 0L
+        var connection: HttpURLConnection? = null
         try {
+            connection = (URL(LlmModelStore.MODEL_URL).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 20_000
+                readTimeout = 60_000
+                requestMethod = "GET"
+                instanceFollowRedirects = true
+                if (existing > 0L) setRequestProperty("Range", "bytes=$existing-")
+            }
             connection.connect()
+
+            val code = connection.responseCode
+            if (existing > 0L && code == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE) {
+                temp.delete()
+                existing = 0L
+                connection.disconnect()
+                connection = (URL(LlmModelStore.MODEL_URL).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 20_000
+                    readTimeout = 60_000
+                    requestMethod = "GET"
+                    instanceFollowRedirects = true
+                }
+                connection.connect()
+            }
+
             require(connection.responseCode in 200..299) {
                 "Model download failed: HTTP ${connection.responseCode}"
             }
-            val total = connection.contentLengthLong
-            var downloaded = 0L
-            temp.delete()
+
+            val resumed = existing > 0L && connection.responseCode == HttpURLConnection.HTTP_PARTIAL
+            if (!resumed) {
+                existing = 0L
+                temp.delete()
+            }
+
+            val remaining = connection.contentLengthLong
+            val total = if (remaining > 0L) existing + remaining else -1L
+            var downloaded = existing
             BufferedInputStream(connection.inputStream).use { input ->
-                FileOutputStream(temp).use { output ->
+                FileOutputStream(temp, resumed).use { output ->
                     val buffer = ByteArray(1024 * 1024)
                     while (true) {
                         val read = input.read(buffer)
@@ -42,6 +66,7 @@ class LlmModelInstaller(private val store: LlmModelStore) {
                     output.fd.sync()
                 }
             }
+
             require(temp.length() >= LlmModelStore.MIN_MODEL_BYTES) {
                 "Downloaded Qwen model is incomplete"
             }
@@ -51,8 +76,8 @@ class LlmModelInstaller(private val store: LlmModelStore) {
             check(temp.renameTo(target)) { "Could not install Qwen model atomically" }
             store.validate().getOrThrow()
         } finally {
-            connection.disconnect()
-            if (temp.exists()) temp.delete()
+            connection?.disconnect()
+            if (temp.exists() && target.length() < LlmModelStore.MIN_MODEL_BYTES) temp.delete()
         }
     }
 
