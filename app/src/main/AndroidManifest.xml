@@ -12,8 +12,7 @@
         android:allowBackup="true"
         android:label="Siya Ai"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SiyaAi"
-        android:extractNativeLibs="true">
+        android:theme="@style/Theme.SiyaAi">
 
         <activity
             android:name=".MainActivity"
