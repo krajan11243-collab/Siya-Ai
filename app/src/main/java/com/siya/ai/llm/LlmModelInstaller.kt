@@ -17,39 +17,20 @@ class LlmModelInstaller(private val store: LlmModelStore) {
         var existing = if (temp.isFile) temp.length() else 0L
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL(LlmModelStore.MODEL_URL).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 20_000
-                readTimeout = 60_000
-                requestMethod = "GET"
-                instanceFollowRedirects = true
-                if (existing > 0L) setRequestProperty("Range", "bytes=$existing-")
-            }
+            connection = open(existing)
             connection.connect()
-
-            val code = connection.responseCode
-            if (existing > 0L && code == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE) {
-                temp.delete()
-                existing = 0L
+            var code = connection.responseCode
+            if (existing > 0L && code == 416) {
                 connection.disconnect()
-                connection = (URL(LlmModelStore.MODEL_URL).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 20_000
-                    readTimeout = 60_000
-                    requestMethod = "GET"
-                    instanceFollowRedirects = true
-                }
-                connection.connect()
-            }
-
-            require(connection.responseCode in 200..299) {
-                "Model download failed: HTTP ${connection.responseCode}"
-            }
-
-            val resumed = existing > 0L && connection.responseCode == HttpURLConnection.HTTP_PARTIAL
-            if (!resumed) {
-                existing = 0L
                 temp.delete()
+                existing = 0L
+                connection = open(0L)
+                connection.connect()
+                code = connection.responseCode
             }
-
+            require(code in 200..299) { "Model download failed: HTTP $code" }
+            val resumed = existing > 0L && code == HttpURLConnection.HTTP_PARTIAL
+            if (!resumed) { existing = 0L; temp.delete() }
             val remaining = connection.contentLengthLong
             val total = if (remaining > 0L) existing + remaining else -1L
             var downloaded = existing
@@ -66,13 +47,8 @@ class LlmModelInstaller(private val store: LlmModelStore) {
                     output.fd.sync()
                 }
             }
-
-            require(temp.length() >= LlmModelStore.MIN_MODEL_BYTES) {
-                "Downloaded Qwen model is incomplete"
-            }
-            require(sha256(temp).equals(LlmModelStore.MODEL_SHA256, ignoreCase = true)) {
-                "Downloaded Qwen model SHA-256 mismatch"
-            }
+            require(temp.length() >= LlmModelStore.MIN_MODEL_BYTES) { "Downloaded Qwen model is incomplete" }
+            require(sha256(temp).equals(LlmModelStore.MODEL_SHA256, ignoreCase = true)) { "Downloaded Qwen model SHA-256 mismatch" }
             check(temp.renameTo(target)) { "Could not install Qwen model atomically" }
             store.validate().getOrThrow()
         } finally {
@@ -81,15 +57,19 @@ class LlmModelInstaller(private val store: LlmModelStore) {
         }
     }
 
+    private fun open(offset: Long): HttpURLConnection = (URL(LlmModelStore.MODEL_URL).openConnection() as HttpURLConnection).apply {
+        connectTimeout = 20_000
+        readTimeout = 60_000
+        requestMethod = "GET"
+        instanceFollowRedirects = true
+        if (offset > 0L) setRequestProperty("Range", "bytes=$offset-")
+    }
+
     private fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         FileInputStream(file).use { input ->
             val buffer = ByteArray(1024 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
+            while (true) { val read = input.read(buffer); if (read < 0) break; digest.update(buffer, 0, read) }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
