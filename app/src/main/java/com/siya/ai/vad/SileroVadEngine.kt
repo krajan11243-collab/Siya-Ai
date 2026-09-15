@@ -4,11 +4,9 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import java.nio.FloatBuffer
+import java.nio.LongBuffer
 
-/**
- * Silero VAD v5 ONNX streaming wrapper for 16 kHz mono PCM16.
- * A 512-sample audio window is combined with 64 samples of rolling context.
- */
+/** Silero VAD v5 ONNX streaming wrapper for 16 kHz mono PCM16. */
 class SileroVadEngine(
     private val modelBytes: ByteArray,
     private val config: VadConfig = VadConfig()
@@ -25,7 +23,6 @@ class SileroVadEngine(
         val options = OrtSession.SessionOptions().apply {
             setInterOpNumThreads(1)
             setIntraOpNumThreads(1)
-            setLogSeverityLevel(3)
         }
         session = try {
             environment.createSession(modelBytes, options)
@@ -33,7 +30,6 @@ class SileroVadEngine(
             options.close()
             throw IllegalArgumentException("Unable to load Silero VAD ONNX model", t)
         } finally {
-            // The session keeps the required native state after creation.
             options.close()
         }
     }
@@ -58,19 +54,11 @@ class SileroVadEngine(
         for (i in context.indices) input[i] = context[i]
         for (i in 0 until length) input[config.contextSamples + i] = pcm16[i] / 32768f
 
-        val inputTensor = OnnxTensor.createTensor(
-            environment,
-            FloatBuffer.wrap(input),
-            longArrayOf(1, input.size.toLong())
-        )
-        val stateTensor = OnnxTensor.createTensor(
-            environment,
-            FloatBuffer.wrap(state),
-            longArrayOf(2, 1, 128)
-        )
+        val inputTensor = OnnxTensor.createTensor(environment, FloatBuffer.wrap(input), longArrayOf(1, input.size.toLong()))
+        val stateTensor = OnnxTensor.createTensor(environment, FloatBuffer.wrap(state), longArrayOf(2, 1, 128))
         val sampleRateTensor = OnnxTensor.createTensor(
             environment,
-            longArrayOf(config.sampleRate.toLong()),
+            LongBuffer.wrap(longArrayOf(config.sampleRate.toLong())),
             longArrayOf(1)
         )
 
@@ -100,11 +88,9 @@ class SileroVadEngine(
         var index = 0
         fun visit(v: Any?) {
             when (v) {
-                is FloatArray -> {
-                    for (x in v) {
-                        require(index < target.size) { "Silero state output is too large" }
-                        target[index++] = x
-                    }
+                is FloatArray -> for (x in v) {
+                    require(index < target.size) { "Silero state output is too large" }
+                    target[index++] = x
                 }
                 is Array<*> -> for (child in v) visit(child)
                 else -> error("Unexpected Silero state output type: ${v?.javaClass}")
