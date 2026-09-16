@@ -6,11 +6,11 @@ import org.junit.Test
 
 class LlmPart5Test {
     @Test
-    fun defaultConfigIsMobileSafeAndFast() {
+    fun defaultConfigIsMobileAdaptiveAndFast() {
         val config = LlmConfig()
-        assertEquals(1024, config.contextSize)
-        assertEquals(4, config.threads)
-        assertEquals(48, config.maxTokens)
+        assertEquals(768, config.contextSize)
+        assertEquals(32, config.maxTokens)
+        assertTrue(config.threads in 2..6)
     }
 
     @Test
