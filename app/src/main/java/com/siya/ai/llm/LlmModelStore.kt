@@ -1,6 +1,7 @@
 package com.siya.ai.llm
 
 import android.content.Context
+import com.siya.ai.storage.SharedModelBackup
 import java.io.File
 
 class LlmModelStore(context: Context) {
@@ -20,6 +21,7 @@ class LlmModelStore(context: Context) {
     )
     private val root = if (File(legacyRoot, MODEL_FILE).isFile) legacyRoot else externalRoot
         .apply { mkdirs() }
+    private val sharedBackup = SharedModelBackup(context)
 
     val modelFile: File get() = File(root, MODEL_FILE)
 
@@ -29,6 +31,13 @@ class LlmModelStore(context: Context) {
         require(modelFile.isFile) { "Qwen GGUF model is missing" }
         require(modelFile.length() >= MIN_MODEL_BYTES) { "Qwen GGUF model is incomplete" }
     }
+
+    suspend fun restoreFromShared(): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        if (isInstalled()) return@withContext true
+        sharedBackup.restoreTo(MODEL_FILE, SharedModelBackup.LLM_PATH, modelFile, MIN_MODEL_BYTES)
+    }
+
+    fun backupToShared(): Boolean = sharedBackup.copyToShared(modelFile, SharedModelBackup.LLM_PATH)
 
     fun modelPath(): String = modelFile.absolutePath
     fun modelDirectory(): File = root
