@@ -12,6 +12,10 @@ import java.security.MessageDigest
 
 class LlmModelInstaller(private val store: LlmModelStore) {
     suspend fun download(onProgress: (Long, Long) -> Unit = { _, _ -> }) = withContext(Dispatchers.IO) {
+        if (store.restoreFromShared()) {
+            onProgress(store.modelFile.length(), store.modelFile.length())
+            return@withContext
+        }
         val target = store.modelFile
         val temp = File(target.parentFile, "${target.name}.download")
         var existing = if (temp.isFile) temp.length() else 0L
@@ -51,6 +55,7 @@ class LlmModelInstaller(private val store: LlmModelStore) {
             require(sha256(temp).equals(LlmModelStore.MODEL_SHA256, ignoreCase = true)) { "Downloaded Qwen model SHA-256 mismatch" }
             check(temp.renameTo(target)) { "Could not install Qwen model atomically" }
             store.validate().getOrThrow()
+            store.backupToShared()
         } finally {
             connection?.disconnect()
             if (temp.exists() && target.length() < LlmModelStore.MIN_MODEL_BYTES) temp.delete()
