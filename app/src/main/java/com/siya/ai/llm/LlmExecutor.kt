@@ -15,6 +15,20 @@ class LlmExecutor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
     private var engine: LocalLlmEngine? = null
 
+    /** Warm the GGUF model once so the first spoken request does not pay the full load cost. */
+    fun warmUp() {
+        if (closed.get()) return
+        scope.launch {
+            runCatching {
+                val loaded = engine ?: engineFactory().also {
+                    it.load()
+                    engine = it
+                }
+                loaded
+            }
+        }
+    }
+
     fun submit(prompt: String) {
         if (closed.get()) return
         scope.launch {
