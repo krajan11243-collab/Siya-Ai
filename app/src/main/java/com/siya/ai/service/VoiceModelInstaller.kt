@@ -11,17 +11,27 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Downloads the VAD/STT assets into app-private storage with resumable temp files. */
+/** Downloads VAD/STT assets with progress and shared-storage persistence. */
 class VoiceModelInstaller(private val vadStore: VadModelStore, private val sttStore: SttModelStore) {
     suspend fun downloadVad(onProgress: (Long, Long) -> Unit = { _, _ -> }) = withContext(Dispatchers.IO) {
+        if (vadStore.restoreFromShared()) {
+            onProgress(vadStore.modelFile.length(), vadStore.modelFile.length())
+            return@withContext
+        }
         downloadFile(VAD_URL, vadStore.modelFile, MIN_VAD_BYTES, onProgress)
         check(vadStore.isInstalled()) { "Silero VAD model validation failed" }
+        vadStore.backupToShared()
     }
 
     suspend fun downloadHindiStt(onProgress: (Long, Long) -> Unit = { _, _ -> }) = withContext(Dispatchers.IO) {
+        if (sttStore.restoreFromShared()) {
+            onProgress(sttStore.modelFile.length(), sttStore.modelFile.length())
+            return@withContext
+        }
         downloadFile(SttModelSource.MODEL_URL, sttStore.modelFile, MIN_STT_MODEL_BYTES, onProgress)
         downloadFile(SttModelSource.TOKENS_URL, sttStore.tokensFile, MIN_STT_TOKENS_BYTES, onProgress)
         sttStore.validate().getOrThrow()
+        sttStore.backupToShared()
     }
 
     private fun downloadFile(url: String, target: File, minimumBytes: Long, onProgress: (Long, Long) -> Unit) {
@@ -43,10 +53,7 @@ class VoiceModelInstaller(private val vadStore: VadModelStore, private val sttSt
             }
             require(code in 200..299) { "Download failed: HTTP $code" }
             val resumed = existing > 0L && code == HttpURLConnection.HTTP_PARTIAL
-            if (!resumed) {
-                existing = 0L
-                temp.delete()
-            }
+            if (!resumed) { existing = 0L; temp.delete() }
             val remaining = connection.contentLengthLong
             val total = if (remaining > 0L) existing + remaining else -1L
             var downloaded = existing
