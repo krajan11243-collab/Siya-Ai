@@ -3,13 +3,7 @@ package com.siya.ai.stt
 import android.content.Context
 import java.io.File
 
-/**
- * Local-only ASR model storage.
- *
- * Expected layout:
- * files/models/asr/hi/model.int8.onnx
- * files/models/asr/hi/tokens.txt
- */
+/** Local-only ASR model storage in a persistent external app directory. */
 class SttModelStore(context: Context) {
     companion object {
         const val LANGUAGE_HI = "hi"
@@ -19,7 +13,13 @@ class SttModelStore(context: Context) {
         private const val MIN_TOKENS_BYTES = 10_000L
     }
 
-    private val root = File(context.filesDir, "models/asr/$LANGUAGE_HI").apply { mkdirs() }
+    private val legacyRoot = File(context.filesDir, "models/asr/$LANGUAGE_HI")
+    private val externalRoot = File(
+        context.getExternalFilesDir(null) ?: context.filesDir,
+        "SiyaAi/Models/ASR/$LANGUAGE_HI"
+    )
+    private val root = if (File(legacyRoot, MODEL_FILE).isFile) legacyRoot else externalRoot
+        .apply { mkdirs() }
 
     val modelFile: File get() = File(root, MODEL_FILE)
     val tokensFile: File get() = File(root, TOKENS_FILE)
@@ -35,4 +35,5 @@ class SttModelStore(context: Context) {
 
     fun modelPath(): String = modelFile.absolutePath
     fun tokensPath(): String = tokensFile.absolutePath
+    fun modelDirectory(): File = root
 }
