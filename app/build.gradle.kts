@@ -65,7 +65,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.2")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.28.2")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.29.0")
     implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8")
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
     testImplementation("junit:junit:4.13.2")
