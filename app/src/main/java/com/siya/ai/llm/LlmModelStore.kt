@@ -13,22 +13,15 @@ class LlmModelStore(context: Context) {
         const val MIN_MODEL_BYTES = 1_000_000_000L
     }
 
-    private val root = File(
+    private val legacyRoot = File(context.filesDir, "models/llm/qwen2.5-1.5b")
+    private val externalRoot = File(
         context.getExternalFilesDir(null) ?: context.filesDir,
         "SiyaAi/Models/LLM/qwen2.5-1.5b"
-    ).apply { mkdirs() }
+    )
+    private val root = if (File(legacyRoot, MODEL_FILE).isFile) legacyRoot else externalRoot
+        .apply { mkdirs() }
 
-    private val legacyRoot = File(context.filesDir, "models/llm/qwen2.5-1.5b")
-    val modelFile: File = File(root, MODEL_FILE).also { target ->
-        val legacy = File(legacyRoot, MODEL_FILE)
-        if (!target.exists() && legacy.isFile && legacy.length() >= MIN_MODEL_BYTES) {
-            runCatching {
-                target.parentFile?.mkdirs()
-                legacy.copyTo(target, overwrite = false)
-                legacy.delete()
-            }
-        }
-    }
+    val modelFile: File get() = File(root, MODEL_FILE)
 
     fun isInstalled(): Boolean = validate().isSuccess
 
@@ -38,4 +31,5 @@ class LlmModelStore(context: Context) {
     }
 
     fun modelPath(): String = modelFile.absolutePath
+    fun modelDirectory(): File = root
 }
