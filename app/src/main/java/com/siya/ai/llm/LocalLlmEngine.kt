@@ -12,10 +12,11 @@ class LocalLlmEngine(
     private val closed = AtomicBoolean(false)
     private var model: LlamaModel? = null
 
-    /** Loads the GGUF model once and safely reuses it for later chat turns. */
+    /** Loads the GGUF model once and restores a matching shared backup before validation. */
     suspend fun load() {
         check(!closed.get()) { "LocalLlmEngine is closed" }
         if (model != null) return
+        modelStore.restoreFromShared()
         modelStore.validate().getOrThrow()
         model = Llama.loadModel(
             modelPath = modelStore.modelPath(),
