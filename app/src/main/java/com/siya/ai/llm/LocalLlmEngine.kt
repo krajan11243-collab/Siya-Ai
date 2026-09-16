@@ -12,7 +12,7 @@ class LocalLlmEngine(
     private val closed = AtomicBoolean(false)
     private var model: LlamaModel? = null
 
-    /** Loads the GGUF model once and restores a matching shared backup before validation. */
+    /** Loads the GGUF model once and restores/backups the model across app-data loss. */
     suspend fun load() {
         check(!closed.get()) { "LocalLlmEngine is closed" }
         if (model != null) return
@@ -29,6 +29,8 @@ class LocalLlmEngine(
                 topK = 40,
             ),
         )
+        // Existing app-private models are migrated to the shared Siya Ai folder once.
+        modelStore.backupToShared()
     }
 
     suspend fun complete(
