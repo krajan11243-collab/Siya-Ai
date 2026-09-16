@@ -69,9 +69,11 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.2")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    // sherpa-onnx v1.13.5 updated Android to ONNX Runtime 1.27.1.
-    // Keep the Java/native runtime pair aligned to avoid OrtGetApiBase loader failures.
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.1")
+    // Sherpa-ONNX v1.13.5 uses ONNX Runtime 1.27.1 internally on Android.
+    // 1.27.1 is not published to Maven Central; use the current Maven Central
+    // Android runtime so the Java API resolves while packaging selects one native
+    // libonnxruntime.so. Runtime compatibility will be verified on-device.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.29.0")
     implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.5")
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
     testImplementation("junit:junit:4.13.2")
