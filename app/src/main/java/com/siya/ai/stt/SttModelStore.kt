@@ -1,9 +1,10 @@
 package com.siya.ai.stt
 
 import android.content.Context
+import com.siya.ai.storage.SharedModelBackup
 import java.io.File
 
-/** Local-only ASR model storage in a persistent external app directory. */
+/** Local ASR model storage with a user-visible shared backup. */
 class SttModelStore(context: Context) {
     companion object {
         const val LANGUAGE_HI = "hi"
@@ -20,6 +21,7 @@ class SttModelStore(context: Context) {
     )
     private val root = if (File(legacyRoot, MODEL_FILE).isFile) legacyRoot else externalRoot
         .apply { mkdirs() }
+    private val sharedBackup = SharedModelBackup(context)
 
     val modelFile: File get() = File(root, MODEL_FILE)
     val tokensFile: File get() = File(root, TOKENS_FILE)
@@ -32,6 +34,17 @@ class SttModelStore(context: Context) {
         require(tokensFile.isFile) { "Hindi STT tokens.txt is missing" }
         require(tokensFile.length() >= MIN_TOKENS_BYTES) { "Hindi STT tokens file is incomplete" }
     }
+
+    fun restoreFromShared(): Boolean {
+        if (isInstalled()) return true
+        val modelOk = sharedBackup.restoreTo(MODEL_FILE, SharedModelBackup.ASR_PATH, modelFile, MIN_MODEL_BYTES)
+        val tokensOk = sharedBackup.restoreTo(TOKENS_FILE, SharedModelBackup.ASR_PATH, tokensFile, MIN_TOKENS_BYTES)
+        return modelOk && tokensOk && isInstalled()
+    }
+
+    fun backupToShared(): Boolean =
+        sharedBackup.copyToShared(modelFile, SharedModelBackup.ASR_PATH) &&
+            sharedBackup.copyToShared(tokensFile, SharedModelBackup.ASR_PATH)
 
     fun modelPath(): String = modelFile.absolutePath
     fun tokensPath(): String = tokensFile.absolutePath
