@@ -69,10 +69,10 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.2")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    // sherpa-onnx 1.13.5 is built against ONNX Runtime 1.27.1.
+    // sherpa-onnx 1.13.4 is built against ONNX Runtime 1.27.0.
     // Keep the native ONNX Runtime pair aligned; mixing versions causes OrtGetApiBase loader failures.
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.1")
-    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.5")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.0")
+    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.4")
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
