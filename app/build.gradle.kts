@@ -8,7 +8,7 @@ plugins {
 
 val ciKeystore = layout.buildDirectory.file("ci/siya-debug.keystore").get().asFile
 if (!ciKeystore.exists()) {
-    val encoded = file("ci/siya-debug.keystore.b64").readText().trim()
+    val encoded = rootProject.file("ci/siya-debug.keystore.b64").readText().trim()
     ciKeystore.parentFile.mkdirs()
     ciKeystore.writeBytes(Base64.getDecoder().decode(encoded))
 }
@@ -32,9 +32,7 @@ android {
             keyPassword = "siya1234"
         }
     }
-    buildTypes {
-        getByName("debug") { signingConfig = signingConfigs.getByName("ciStableDebug") }
-    }
+    buildTypes { getByName("debug") { signingConfig = signingConfigs.getByName("ciStableDebug") } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
