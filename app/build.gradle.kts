@@ -1,16 +1,7 @@
-import java.util.Base64
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-}
-
-val ciKeystore = layout.buildDirectory.file("ci/siya-debug.keystore").get().asFile
-if (!ciKeystore.exists()) {
-    val encoded = rootProject.file("ci/siya-debug.keystore.b64").readText().trim()
-    ciKeystore.parentFile.mkdirs()
-    ciKeystore.writeBytes(Base64.getDecoder().decode(encoded))
 }
 
 android {
@@ -24,15 +15,11 @@ android {
         versionName = "0.4.0"
         vectorDrawables.useSupportLibrary = true
     }
-    signingConfigs {
-        create("ciStableDebug") {
-            storeFile = ciKeystore
-            storePassword = "siya1234"
-            keyAlias = "siya-debug"
-            keyPassword = "siya1234"
+    buildTypes {
+        getByName("debug") {
+            // Use the standard Android debug keystore; CI no longer depends on a checked-in keystore file.
         }
     }
-    buildTypes { getByName("debug") { signingConfig = signingConfigs.getByName("ciStableDebug") } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
