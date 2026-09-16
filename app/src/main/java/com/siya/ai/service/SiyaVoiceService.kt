@@ -54,17 +54,23 @@ class SiyaVoiceService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            VoiceSessionState.error("Microphone permission is required")
             stopSelf()
             return START_NOT_STICKY
         }
-        if (audioEngine?.isRunning() == true) return START_STICKY
+        if (audioEngine?.isRunning() == true) {
+            VoiceSessionState.listening()
+            return START_STICKY
+        }
 
         val engine = audioEngine ?: AudioEngine(this, onPcm = ::onPcm).also { audioEngine = it }
         if (!engine.start()) {
+            VoiceSessionState.error("Microphone unavailable on this device")
             updateNotification("Microphone unavailable")
             stopSelf()
             return START_NOT_STICKY
         }
+        VoiceSessionState.listening()
         updateNotification(
             when {
                 vad != null && sttPipeline != null && llmExecutor != null -> "Microphone + VAD + Hindi STT + local AI active"
@@ -79,16 +85,17 @@ class SiyaVoiceService : Service() {
     private fun initializeLlmIfInstalled() {
         val store = LlmModelStore(this)
         if (!store.isInstalled()) return
-        llmExecutor = LlmExecutor(
-            engineFactory = { LocalLlmEngine(store) },
-        ) { result ->
+        llmExecutor = LlmExecutor(engineFactory = { LocalLlmEngine(store) }) { result ->
             result.onSuccess { answer ->
                 if (answer.text.isNotBlank()) {
+                    VoiceSessionState.ready(answer.text)
                     updateNotification("Siya: ${answer.text.take(120)}")
                 } else {
+                    VoiceSessionState.error("Siya returned an empty response")
                     updateNotification("Siya local AI returned empty text")
                 }
-            }.onFailure {
+            }.onFailure { error ->
+                VoiceSessionState.error(error.message ?: "Local AI error")
                 updateNotification("Local AI error • microphone still active")
             }
         }
@@ -103,12 +110,19 @@ class SiyaVoiceService : Service() {
             sttPipeline = SttPipeline(executor) { result ->
                 result.onSuccess { stt ->
                     if (stt.text.isNotBlank()) {
+                        VoiceSessionState.thinking(stt.text)
                         updateNotification("Hindi: ${stt.text.take(80)}")
-                        llmExecutor?.submit(stt.text)
+                        if (llmExecutor == null) {
+                            VoiceSessionState.error("Local Qwen model is not installed")
+                        } else {
+                            llmExecutor?.submit(stt.text)
+                        }
                     } else {
+                        VoiceSessionState.error("I could not understand the speech")
                         updateNotification("Hindi STT returned empty text")
                     }
-                }.onFailure {
+                }.onFailure { error ->
+                    VoiceSessionState.error(error.message ?: "Hindi STT error")
                     updateNotification("Hindi STT error • microphone still active")
                 }
             }
@@ -153,12 +167,19 @@ class SiyaVoiceService : Service() {
                 processor.accept(copy, copy.size) { result ->
                     sttPipeline?.onVad(result)
                     when (result.event?.type) {
-                        com.siya.ai.vad.VadEventType.SPEECH_START -> updateNotification("Speech detected • Siya Ai ready")
-                        com.siya.ai.vad.VadEventType.SPEECH_END -> updateNotification("Transcribing Hindi…")
+                        com.siya.ai.vad.VadEventType.SPEECH_START -> {
+                            VoiceSessionState.listening()
+                            updateNotification("Speech detected • Siya Ai ready")
+                        }
+                        com.siya.ai.vad.VadEventType.SPEECH_END -> {
+                            VoiceSessionState.transcribing()
+                            updateNotification("Transcribing Hindi…")
+                        }
                         null -> if (result.state == VadState.ENDING) Unit
                     }
                 }
             }.onFailure {
+                VoiceSessionState.error(it.message ?: "VAD error")
                 updateNotification("VAD error • microphone still active")
             }
         }
@@ -180,6 +201,7 @@ class SiyaVoiceService : Service() {
         vadProcessor = null
         vad?.close()
         vad = null
+        VoiceSessionState.stopped()
         super.onDestroy()
     }
 
