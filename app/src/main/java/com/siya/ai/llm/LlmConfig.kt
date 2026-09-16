@@ -1,10 +1,10 @@
 package com.siya.ai.llm
 
 data class LlmConfig(
-    val contextSize: Int = 2048,
+    val contextSize: Int = 1536,
     val threads: Int = 4,
-    val maxTokens: Int = 256,
-    val temperature: Float = 0.7f,
+    val maxTokens: Int = 96,
+    val temperature: Float = 0.55f,
     val topP: Float = 0.9f,
 ) {
     init {
