@@ -13,7 +13,6 @@ import android.os.HandlerThread
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.siya.ai.R
 import com.siya.ai.audio.AudioEngine
 import com.siya.ai.llm.LlmExecutor
 import com.siya.ai.llm.LlmModelStore
@@ -70,7 +69,13 @@ class SiyaVoiceService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+
         VoiceSessionState.listening()
+        when {
+            vad == null -> VoiceSessionState.error("Install the Silero VAD model first")
+            sttPipeline == null -> VoiceSessionState.error("Install the Hindi STT model first")
+            llmExecutor == null -> VoiceSessionState.error("Install the Qwen local model first")
+        }
         updateNotification(
             when {
                 vad != null && sttPipeline != null && llmExecutor != null -> "Microphone + VAD + Hindi STT + local AI active"
@@ -99,6 +104,7 @@ class SiyaVoiceService : Service() {
                 updateNotification("Local AI error • microphone still active")
             }
         }
+        llmExecutor?.warmUp()
     }
 
     private fun initializeSttIfInstalled() {
