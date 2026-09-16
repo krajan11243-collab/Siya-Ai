@@ -33,7 +33,7 @@ class VoiceModelInstaller(private val vadStore: VadModelStore, private val sttSt
             connection = open(url, existing)
             connection.connect()
             var code = connection.responseCode
-            if (existing > 0L && code == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE) {
+            if (existing > 0L && code == 416) {
                 connection.disconnect()
                 temp.delete()
                 existing = 0L
