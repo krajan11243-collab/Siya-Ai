@@ -22,6 +22,7 @@ import com.siya.ai.stt.SttExecutor
 import com.siya.ai.stt.SttModelStore
 import com.siya.ai.stt.SttPipeline
 import com.siya.ai.vad.SileroVadEngine
+import com.siya.ai.vad.VadEventType
 import com.siya.ai.vad.VadModelStore
 import com.siya.ai.vad.VadPcmProcessor
 import com.siya.ai.vad.VadState
@@ -56,14 +57,11 @@ class SiyaVoiceService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-
-        // Models can be installed while this service instance is alive. Re-check them on every start.
         ensureModelsInitialized()
         if (audioEngine?.isRunning() == true) {
             VoiceSessionState.listening()
             return START_STICKY
         }
-
         if (vad == null || sttPipeline == null || llmExecutor == null) {
             val missing = buildList {
                 if (vad == null) add("Silero VAD")
@@ -74,7 +72,6 @@ class SiyaVoiceService : Service() {
             updateNotification("Missing offline model: $missing")
             return START_NOT_STICKY
         }
-
         val engine = audioEngine ?: AudioEngine(this, onPcm = ::onPcm).also { audioEngine = it }
         if (!engine.start()) {
             VoiceSessionState.error("Microphone unavailable on this device")
@@ -167,7 +164,6 @@ class SiyaVoiceService : Service() {
 
     private fun onPcm(buffer: ShortArray, length: Int) {
         if (length <= 0) return
-        // STT receives the raw PCM first so its 320 ms pre-roll includes the VAD trigger frame.
         sttPipeline?.onAudio(buffer, length)
         val handler = vadHandler ?: return
         val copy = buffer.copyOf(length)
