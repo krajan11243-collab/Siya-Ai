@@ -8,8 +8,8 @@ class LlmPart5Test {
     @Test
     fun defaultConfigIsMobileAdaptiveAndFast() {
         val config = LlmConfig()
-        assertEquals(768, config.contextSize)
-        assertEquals(32, config.maxTokens)
+        assertEquals(512, config.contextSize)
+        assertEquals(12, config.maxTokens)
         assertTrue(config.threads in 2..6)
     }
 
