@@ -1,11 +1,9 @@
 package com.siya.ai.storage
 
-import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.provider.MediaStore
 import java.io.File
 
@@ -35,7 +33,8 @@ class SharedModelBackup(private val context: Context) {
         if (!source.isFile || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
         val resolver = context.contentResolver
         val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        find(source.name, relativePath)?.let { resolver.delete(it, null, null) }
+        // Do not rewrite a valid existing backup on every app start/update.
+        if (find(source.name, relativePath) != null) return true
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, source.name)
             put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
