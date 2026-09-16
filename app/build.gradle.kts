@@ -13,6 +13,10 @@ if (!ciKeystore.exists()) {
     ciKeystore.writeBytes(Base64.getDecoder().decode(encoded))
 }
 
+val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val buildVersionCode = (ciRunNumber?.let { 1000 + it } ?: 5).coerceAtLeast(5)
+val buildVersionName = ciRunNumber?.let { "0.5.$it" } ?: "0.5.0"
+
 android {
     namespace = "com.siya.ai"
     compileSdk = 35
@@ -20,8 +24,8 @@ android {
         applicationId = "com.siya.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = buildVersionCode
+        versionName = buildVersionName
         vectorDrawables.useSupportLibrary = true
     }
     signingConfigs {
@@ -65,8 +69,10 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.2")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.29.0")
-    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8")
+    // sherpa-onnx 1.13.5 is built against ONNX Runtime 1.27.1.
+    // Keep the native ONNX Runtime pair aligned; mixing versions causes OrtGetApiBase loader failures.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.1")
+    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.5")
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
