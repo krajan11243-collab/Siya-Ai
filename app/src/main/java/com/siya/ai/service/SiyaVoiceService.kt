@@ -45,9 +45,10 @@ class SiyaVoiceService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Audio engine starting"))
+        startForeground(NOTIFICATION_ID, buildNotification("Preparing offline voice models"))
         initializeLlmIfInstalled()
         initializeSttIfInstalled()
+        initializeVadIfInstalled()
         startVadWorker()
     }
 
@@ -61,7 +62,16 @@ class SiyaVoiceService : Service() {
             VoiceSessionState.listening()
             return START_STICKY
         }
-
+        if (vad == null || sttPipeline == null || llmExecutor == null) {
+            val missing = buildList {
+                if (vad == null) add("Silero VAD")
+                if (sttPipeline == null) add("Hindi STT")
+                if (llmExecutor == null) add("Qwen LLM")
+            }.joinToString(", ")
+            VoiceSessionState.error("Install required offline models: $missing")
+            updateNotification("Missing offline model: $missing")
+            return START_NOT_STICKY
+        }
         val engine = audioEngine ?: AudioEngine(this, onPcm = ::onPcm).also { audioEngine = it }
         if (!engine.start()) {
             VoiceSessionState.error("Microphone unavailable on this device")
@@ -69,21 +79,8 @@ class SiyaVoiceService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-
         VoiceSessionState.listening()
-        when {
-            vad == null -> VoiceSessionState.error("Install the Silero VAD model first")
-            sttPipeline == null -> VoiceSessionState.error("Install the Hindi STT model first")
-            llmExecutor == null -> VoiceSessionState.error("Install the Qwen local model first")
-        }
-        updateNotification(
-            when {
-                vad != null && sttPipeline != null && llmExecutor != null -> "Microphone + VAD + Hindi STT + local AI active"
-                vad != null && sttPipeline != null -> "Microphone + VAD + Hindi STT active • LLM not installed"
-                vad != null -> "Microphone + VAD active • STT/LLM model not installed"
-                else -> "Microphone active • VAD/STT/LLM model not installed"
-            }
-        )
+        updateNotification("Listening • VAD + Hindi STT + local AI ready")
         return START_STICKY
     }
 
@@ -97,11 +94,11 @@ class SiyaVoiceService : Service() {
                     updateNotification("Siya: ${answer.text.take(120)}")
                 } else {
                     VoiceSessionState.error("Siya returned an empty response")
-                    updateNotification("Siya local AI returned empty text")
+                    updateNotification("Siya returned empty text")
                 }
             }.onFailure { error ->
                 VoiceSessionState.error(error.message ?: "Local AI error")
-                updateNotification("Local AI error • microphone still active")
+                updateNotification("Local AI error")
             }
         }
         llmExecutor?.warmUp()
@@ -117,36 +114,23 @@ class SiyaVoiceService : Service() {
                 result.onSuccess { stt ->
                     if (stt.text.isNotBlank()) {
                         VoiceSessionState.thinking(stt.text)
-                        updateNotification("Hindi: ${stt.text.take(80)}")
-                        if (llmExecutor == null) {
-                            VoiceSessionState.error("Local Qwen model is not installed")
-                        } else {
-                            llmExecutor?.submit(stt.text)
-                        }
+                        updateNotification("Thinking about: ${stt.text.take(70)}")
+                        llmExecutor?.submit(stt.text)
                     } else {
                         VoiceSessionState.error("I could not understand the speech")
-                        updateNotification("Hindi STT returned empty text")
+                        updateNotification("Speech was not understood")
                     }
                 }.onFailure { error ->
                     VoiceSessionState.error(error.message ?: "Hindi STT error")
-                    updateNotification("Hindi STT error • microphone still active")
+                    updateNotification("Hindi STT error")
                 }
             }
         }.onFailure {
-            sttExecutor?.close()
-            sttExecutor = null
-            sttPipeline = null
+            sttExecutor?.close(); sttExecutor = null; sttPipeline = null
         }
     }
 
-    private fun startVadWorker() {
-        val thread = HandlerThread("Siya-VAD", Thread.NORM_PRIORITY).apply { start() }
-        vadThread = thread
-        val handler = Handler(thread.looper)
-        vadHandler = handler
-        handler.post { initializeVadIfInstalled() }
-    }
-
+    /** VAD model is only about 2 MB, so initialize it synchronously before accepting mic input. */
     private fun initializeVadIfInstalled() {
         val store = VadModelStore(this)
         if (!store.isInstalled()) return
@@ -155,16 +139,19 @@ class SiyaVoiceService : Service() {
             vad = engine
             vadProcessor = VadPcmProcessor(engine)
         }.onFailure {
-            vad?.close()
-            vad = null
-            vadProcessor = null
+            vad?.close(); vad = null; vadProcessor = null
         }
+    }
+
+    private fun startVadWorker() {
+        val thread = HandlerThread("Siya-VAD", Thread.NORM_PRIORITY).apply { start() }
+        vadThread = thread
+        vadHandler = Handler(thread.looper)
     }
 
     private fun onPcm(buffer: ShortArray, length: Int) {
         if (length <= 0) return
         sttPipeline?.onAudio(buffer, length)
-
         val handler = vadHandler ?: return
         val copy = buffer.copyOf(length)
         handler.post {
@@ -175,7 +162,7 @@ class SiyaVoiceService : Service() {
                     when (result.event?.type) {
                         com.siya.ai.vad.VadEventType.SPEECH_START -> {
                             VoiceSessionState.listening()
-                            updateNotification("Speech detected • Siya Ai ready")
+                            updateNotification("Speech detected")
                         }
                         com.siya.ai.vad.VadEventType.SPEECH_END -> {
                             VoiceSessionState.transcribing()
@@ -186,27 +173,20 @@ class SiyaVoiceService : Service() {
                 }
             }.onFailure {
                 VoiceSessionState.error(it.message ?: "VAD error")
-                updateNotification("VAD error • microphone still active")
+                updateNotification("VAD error")
             }
         }
     }
 
     override fun onDestroy() {
-        sttPipeline?.close()
-        sttPipeline = null
-        sttExecutor?.close()
-        sttExecutor = null
-        llmExecutor?.close()
-        llmExecutor = null
-        audioEngine?.release()
-        audioEngine = null
+        sttPipeline?.close(); sttPipeline = null
+        sttExecutor?.close(); sttExecutor = null
+        llmExecutor?.close(); llmExecutor = null
+        audioEngine?.release(); audioEngine = null
         vadHandler?.removeCallbacksAndMessages(null)
-        vadThread?.quitSafely()
-        vadHandler = null
-        vadThread = null
+        vadThread?.quitSafely(); vadHandler = null; vadThread = null
         vadProcessor = null
-        vad?.close()
-        vad = null
+        vad?.close(); vad = null
         VoiceSessionState.stopped()
         super.onDestroy()
     }
@@ -215,21 +195,16 @@ class SiyaVoiceService : Service() {
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Siya Ai Voice", NotificationManager.IMPORTANCE_LOW)
-            )
+            getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(CHANNEL_ID, "Siya Ai Voice", NotificationManager.IMPORTANCE_LOW))
         }
     }
 
-    private fun buildNotification(text: String): Notification =
-        NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Siya Ai")
-            .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setOngoing(true)
-            .build()
+    private fun buildNotification(text: String): Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        .setContentTitle("Siya Ai")
+        .setContentText(text)
+        .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+        .setOngoing(true)
+        .build()
 
-    private fun updateNotification(text: String) {
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text))
-    }
+    private fun updateNotification(text: String) { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text)) }
 }
