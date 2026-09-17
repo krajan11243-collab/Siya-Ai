@@ -25,6 +25,16 @@ jobs:
         run: gradle :app:testDebugUnitTest --no-daemon
       - name: Build debug APK
         run: gradle :app:assembleDebug --no-daemon
+      - name: Verify stable APK signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE="app/build/ci/siya-debug.keystore"
+          test -f "$KEYSTORE"
+          FINGERPRINT="$(keytool -list -v -keystore "$KEYSTORE" -storepass siya1234 -alias siya-debug | awk -F': ' '/SHA256:/{print $2; exit}')"
+          EXPECTED="19:91:AD:EF:A2:6D:53:DE:C1:16:11:E9:C1:76:BB:F7:E0:0B:F4:02:DE:2C:36:7D:10:BF:B6:4B:DA:14:C2:AA"
+          test "$FINGERPRINT" = "$EXPECTED"
+          echo "Stable signing certificate: $FINGERPRINT"
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
