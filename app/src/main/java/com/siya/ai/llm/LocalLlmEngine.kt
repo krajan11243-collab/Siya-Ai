@@ -1,13 +1,9 @@
 package com.siya.ai.llm
 
-import android.util.Log
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
-import org.codeshipping.llamakotlin.LlamaConfig as NativeLlamaConfig
 import org.codeshipping.llamakotlin.LlamaModel
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Local GGUF engine with real llama.cpp Flow token streaming. */
@@ -43,9 +39,7 @@ class LocalLlmEngine(
     suspend fun complete(
         prompt: String,
         systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
-    ): LlmResult {
-        return stream(prompt, systemPrompt) { }
-    }
+    ): LlmResult = stream(prompt, systemPrompt) { }
 
     /** Streams every generated token. The callback runs on the generation coroutine. */
     suspend fun stream(
@@ -57,7 +51,7 @@ class LocalLlmEngine(
         require(prompt.isNotBlank())
         load()
         val loaded = model ?: error("Qwen model could not be loaded")
-        val formatted = runCatching { buildChatPrompt(loaded, systemPrompt, prompt) }.getOrElse { prompt }
+        val formatted = buildChatPrompt(systemPrompt, prompt)
         val output = StringBuilder()
         val started = System.nanoTime()
         var tokenCount = 0
@@ -78,11 +72,15 @@ class LocalLlmEngine(
         runCatching { model?.cancelGeneration() }
     }
 
-    private fun buildChatPrompt(model: LlamaModel, systemPrompt: String, userPrompt: String): String {
-        val messages = JSONArray()
-            .put(JSONObject().put("role", "system").put("content", systemPrompt))
-            .put(JSONObject().put("role", "user").put("content", userPrompt))
-        return model.applyChatTemplate(messages.toString(), addGenerationPrompt = true)
+    /** Qwen2.5-Instruct chat template, built locally so the Android binding does not need template APIs. */
+    private fun buildChatPrompt(systemPrompt: String, userPrompt: String): String = buildString {
+        append("<|im_start|>system\n")
+        append(systemPrompt.trim())
+        append("<|im_end|>\n")
+        append("<|im_start|>user\n")
+        append(userPrompt.trim())
+        append("<|im_end|>\n")
+        append("<|im_start|>assistant\n")
     }
 
     override fun close() {
