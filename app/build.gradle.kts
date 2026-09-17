@@ -19,7 +19,7 @@ val buildVersionName = ciRunNumber?.let { "0.5.$it" } ?: "0.5.0"
 
 android {
     namespace = "com.siya.ai"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.siya.ai"
         minSdk = 26
