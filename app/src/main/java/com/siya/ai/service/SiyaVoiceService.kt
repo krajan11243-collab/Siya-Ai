@@ -27,7 +27,7 @@ import com.siya.ai.vad.VadModelStore
 import com.siya.ai.vad.VadPcmProcessor
 import com.siya.ai.vad.VadState
 
-/** Foreground microphone host for local audio + VAD + Hindi STT + local LLM. */
+/** Foreground microphone host for local audio + VAD + Hindi STT + local LLM + Part 6 TTS. */
 class SiyaVoiceService : Service() {
     companion object {
         private const val CHANNEL_ID = "siya_voice"
@@ -42,12 +42,14 @@ class SiyaVoiceService : Service() {
     private var sttExecutor: SttExecutor? = null
     private var sttPipeline: SttPipeline? = null
     private var llmExecutor: LlmExecutor? = null
+    private var tts: LocalTtsEngine? = null
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Preparing offline voice models"))
         startVadWorker()
+        tts = runCatching { LocalTtsEngine(this) }.getOrNull()
         ensureModelsInitialized()
     }
 
@@ -57,31 +59,39 @@ class SiyaVoiceService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        ensureModelsInitialized()
-        if (audioEngine?.isRunning() == true) {
+        return try {
+            ensureModelsInitialized()
+            if (audioEngine?.isRunning() == true) {
+                VoiceSessionState.listening()
+                return START_STICKY
+            }
+            if (vad == null || sttPipeline == null || llmExecutor == null) {
+                val missing = buildList {
+                    if (vad == null) add("Silero VAD")
+                    if (sttPipeline == null) add("Hindi STT")
+                    if (llmExecutor == null) add("Qwen LLM")
+                }.joinToString(", ")
+                VoiceSessionState.error("Install required offline models: $missing")
+                updateNotification("Missing offline model: $missing")
+                return START_NOT_STICKY
+            }
+            val engine = audioEngine ?: AudioEngine(this, onPcm = ::onPcm).also { audioEngine = it }
+            if (!engine.start()) {
+                VoiceSessionState.error("Microphone unavailable on this device")
+                updateNotification("Microphone unavailable")
+                stopSelf()
+                return START_NOT_STICKY
+            }
             VoiceSessionState.listening()
-            return START_STICKY
-        }
-        if (vad == null || sttPipeline == null || llmExecutor == null) {
-            val missing = buildList {
-                if (vad == null) add("Silero VAD")
-                if (sttPipeline == null) add("Hindi STT")
-                if (llmExecutor == null) add("Qwen LLM")
-            }.joinToString(", ")
-            VoiceSessionState.error("Install required offline models: $missing")
-            updateNotification("Missing offline model: $missing")
-            return START_NOT_STICKY
-        }
-        val engine = audioEngine ?: AudioEngine(this, onPcm = ::onPcm).also { audioEngine = it }
-        if (!engine.start()) {
-            VoiceSessionState.error("Microphone unavailable on this device")
-            updateNotification("Microphone unavailable")
+            updateNotification("Listening • VAD + Hindi STT + local AI + TTS ready")
+            START_STICKY
+        } catch (error: Throwable) {
+            val message = error.message ?: error.javaClass.simpleName
+            VoiceSessionState.error("Voice engine could not start: $message")
+            updateNotification("Voice engine error — check Models")
             stopSelf()
-            return START_NOT_STICKY
+            START_NOT_STICKY
         }
-        VoiceSessionState.listening()
-        updateNotification("Listening • VAD + Hindi STT + local AI ready")
-        return START_STICKY
     }
 
     private fun ensureModelsInitialized() {
@@ -95,20 +105,26 @@ class SiyaVoiceService : Service() {
         if (llmExecutor != null) return
         val store = LlmModelStore(this)
         if (!store.isInstalled()) return
-        llmExecutor = LlmExecutor(engineFactory = { LocalLlmEngine(store) }) { result ->
-            result.onSuccess { answer ->
-                if (answer.text.isNotBlank()) {
-                    VoiceSessionState.ready(answer.text)
-                    updateNotification("Siya: ${answer.text.take(120)}")
-                } else {
-                    VoiceSessionState.error("Siya returned an empty response")
-                    updateNotification("Siya returned empty text")
+        llmExecutor = runCatching {
+            LlmExecutor(engineFactory = { LocalLlmEngine(store) }) { result ->
+                result.onSuccess { answer ->
+                    if (answer.text.isNotBlank()) {
+                        VoiceSessionState.ready(answer.text)
+                        tts?.speak(answer.text)
+                        updateNotification("Siya: ${answer.text.take(120)}")
+                    } else {
+                        VoiceSessionState.error("Siya returned an empty response")
+                        updateNotification("Siya returned empty text")
+                    }
+                }.onFailure { error ->
+                    VoiceSessionState.error(error.message ?: "Local AI error")
+                    updateNotification("Local AI error")
                 }
-            }.onFailure { error ->
-                VoiceSessionState.error(error.message ?: "Local AI error")
-                updateNotification("Local AI error")
             }
-        }
+        }.onFailure {
+            VoiceSessionState.error("Qwen engine error: ${it.message ?: it.javaClass.simpleName}")
+            null
+        }.getOrNull()
     }
 
     private fun initializeSttIfInstalled() {
@@ -133,10 +149,11 @@ class SiyaVoiceService : Service() {
                     updateNotification("Hindi STT error")
                 }
             }
-        }.onFailure {
+        }.onFailure { error ->
             sttExecutor?.close()
             sttExecutor = null
             sttPipeline = null
+            VoiceSessionState.error("Hindi STT unavailable: ${error.message ?: error.javaClass.simpleName}")
         }
     }
 
@@ -148,10 +165,11 @@ class SiyaVoiceService : Service() {
             val engine = SileroVadEngine(store.readBytes())
             vad = engine
             vadProcessor = VadPcmProcessor(engine)
-        }.onFailure {
+        }.onFailure { error ->
             vad?.close()
             vad = null
             vadProcessor = null
+            VoiceSessionState.error("Silero VAD unavailable: ${error.message ?: error.javaClass.simpleName}")
         }
     }
 
@@ -174,6 +192,7 @@ class SiyaVoiceService : Service() {
                     sttPipeline?.onVad(result)
                     when (result.event?.type) {
                         VadEventType.SPEECH_START -> {
+                            tts?.stop()
                             VoiceSessionState.listening()
                             updateNotification("Speech detected")
                         }
@@ -192,6 +211,9 @@ class SiyaVoiceService : Service() {
     }
 
     override fun onDestroy() {
+        tts?.stop()
+        tts?.close()
+        tts = null
         sttPipeline?.close(); sttPipeline = null
         sttExecutor?.close(); sttExecutor = null
         llmExecutor?.close(); llmExecutor = null
