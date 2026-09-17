@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-/** Single-turn local LLM executor with turn-generation cancellation semantics. */
+/** Single-turn local LLM executor with streaming tokens and hard turn invalidation. */
 class LlmExecutor(
     private val engineFactory: () -> LocalLlmEngine,
     private val onResult: (Result<LlmResult>) -> Unit,
@@ -36,7 +36,7 @@ class LlmExecutor(
         }
     }
 
-    fun submit(prompt: String) {
+    fun submit(prompt: String, onToken: (String) -> Unit = {}) {
         if (closed.get() || prompt.isBlank()) return
         val myTurn = turnId.incrementAndGet()
         currentJob?.cancel()
@@ -44,6 +44,7 @@ class LlmExecutor(
             val result = try {
                 val fast = LlmFastPath.answer(prompt)
                 if (fast != null) {
+                    onToken(fast)
                     Result.success(LlmResult(text = fast, tokensPerSecond = Float.POSITIVE_INFINITY))
                 } else {
                     runCatching {
@@ -51,7 +52,7 @@ class LlmExecutor(
                             it.load()
                             engine = it
                         }
-                        loaded.complete(prompt)
+                        loaded.stream(prompt, onToken = onToken)
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -65,9 +66,9 @@ class LlmExecutor(
         }
     }
 
-    /** Invalidates the active turn immediately. Older native work can finish, but its result is discarded. */
     fun cancelCurrent() {
         turnId.incrementAndGet()
+        engine?.cancelGeneration()
         currentJob?.cancel()
         currentJob = null
     }
@@ -75,6 +76,7 @@ class LlmExecutor(
     override fun close() {
         if (closed.compareAndSet(false, true)) {
             turnId.incrementAndGet()
+            engine?.cancelGeneration()
             currentJob?.cancel()
             currentJob = null
             scope.cancel()
