@@ -27,11 +27,12 @@ import com.siya.ai.vad.VadModelStore
 import com.siya.ai.vad.VadPcmProcessor
 import com.siya.ai.vad.VadState
 
-/** Foreground microphone host for local audio + VAD + Hindi STT + local LLM + Part 6 TTS. */
+/** Foreground host for the local full-duplex VAD -> STT -> LLM -> TTS conversation loop. */
 class SiyaVoiceService : Service() {
     companion object {
         private const val CHANNEL_ID = "siya_voice"
         private const val NOTIFICATION_ID = 1001
+        private const val TURN_TIMEOUT_MS = 45_000L
     }
 
     private var audioEngine: AudioEngine? = null
@@ -43,6 +44,7 @@ class SiyaVoiceService : Service() {
     private var sttPipeline: SttPipeline? = null
     private var llmExecutor: LlmExecutor? = null
     private var tts: LocalTtsEngine? = null
+    private var turnTimeout: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -109,14 +111,17 @@ class SiyaVoiceService : Service() {
             LlmExecutor(engineFactory = { LocalLlmEngine(store) }) { result ->
                 result.onSuccess { answer ->
                     if (answer.text.isNotBlank()) {
-                        VoiceSessionState.ready(answer.text)
+                        cancelTurnTimeout()
+                        VoiceSessionState.speaking(answer.text)
                         tts?.speak(answer.text)
-                        updateNotification("Siya: ${answer.text.take(120)}")
+                        updateNotification("Siya is speaking")
                     } else {
+                        cancelTurnTimeout()
                         VoiceSessionState.error("Siya returned an empty response")
                         updateNotification("Siya returned empty text")
                     }
                 }.onFailure { error ->
+                    cancelTurnTimeout()
                     VoiceSessionState.error(error.message ?: "Local AI error")
                     updateNotification("Local AI error")
                 }
@@ -139,12 +144,15 @@ class SiyaVoiceService : Service() {
                     if (stt.text.isNotBlank()) {
                         VoiceSessionState.thinking(stt.text)
                         updateNotification("Thinking about: ${stt.text.take(70)}")
+                        startTurnTimeout()
                         llmExecutor?.submit(stt.text)
                     } else {
+                        cancelTurnTimeout()
                         VoiceSessionState.error("I could not understand the speech")
                         updateNotification("Speech was not understood")
                     }
                 }.onFailure { error ->
+                    cancelTurnTimeout()
                     VoiceSessionState.error(error.message ?: "Hindi STT error")
                     updateNotification("Hindi STT error")
                 }
@@ -180,6 +188,26 @@ class SiyaVoiceService : Service() {
         vadHandler = Handler(thread.looper)
     }
 
+    private fun startTurnTimeout() {
+        val handler = vadHandler ?: return
+        cancelTurnTimeout()
+        val timeout = Runnable {
+            llmExecutor?.cancelCurrent()
+            tts?.stop()
+            VoiceSessionState.error("This turn timed out. Please try again.")
+            updateNotification("Turn timeout — listening again")
+            VoiceSessionState.listening()
+        }
+        turnTimeout = timeout
+        handler.postDelayed(timeout, TURN_TIMEOUT_MS)
+    }
+
+    private fun cancelTurnTimeout() {
+        val handler = vadHandler ?: return
+        turnTimeout?.let(handler::removeCallbacks)
+        turnTimeout = null
+    }
+
     private fun onPcm(buffer: ShortArray, length: Int) {
         if (length <= 0) return
         sttPipeline?.onAudio(buffer, length)
@@ -192,9 +220,13 @@ class SiyaVoiceService : Service() {
                     sttPipeline?.onVad(result)
                     when (result.event?.type) {
                         VadEventType.SPEECH_START -> {
+                            // Part 7 barge-in: invalidate both the spoken-audio producer and the LLM turn.
+                            VoiceSessionState.interrupting()
+                            cancelTurnTimeout()
+                            llmExecutor?.cancelCurrent()
                             tts?.stop()
                             VoiceSessionState.listening()
-                            updateNotification("Speech detected")
+                            updateNotification("Speech detected • previous turn cancelled")
                         }
                         VadEventType.SPEECH_END -> {
                             VoiceSessionState.transcribing()
@@ -204,6 +236,7 @@ class SiyaVoiceService : Service() {
                     }
                 }
             }.onFailure {
+                cancelTurnTimeout()
                 VoiceSessionState.error(it.message ?: "VAD error")
                 updateNotification("VAD error")
             }
@@ -211,6 +244,7 @@ class SiyaVoiceService : Service() {
     }
 
     override fun onDestroy() {
+        cancelTurnTimeout()
         tts?.stop()
         tts?.close()
         tts = null
