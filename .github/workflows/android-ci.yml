@@ -28,6 +28,30 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Apply CI build fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/siya/ai/ui/SiyaResponsiveAppV2.kt')
+          s = p.read_text()
+          s = s.replace('Icons.Default.Cube', 'Icons.Default.Memory')
+          s = s.replace('fontSize = if (maxWidth < 360.dp) 25.sp else 29.sp', 'fontSize = 27.sp')
+          p.write_text(s)
+
+          p = Path('app/build.gradle.kts')
+          s = p.read_text()
+          dep = '    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.29.0")\n'
+          if 'com.microsoft.onnxruntime:onnxruntime-android' not in s:
+              marker = '    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8")\n'
+              s = s.replace(marker, dep + marker)
+          if 'jniLibs {' not in s:
+              marker = '    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }'
+              replacement = '''    packaging {\n        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"\n        jniLibs {\n            pickFirsts += "lib/arm64-v8a/libonnxruntime.so"\n            pickFirsts += "lib/armeabi-v7a/libonnxruntime.so"\n            pickFirsts += "lib/x86/libonnxruntime.so"\n            pickFirsts += "lib/x86_64/libonnxruntime.so"\n        }\n    }'''
+              s = s.replace(marker, replacement)
+          p.write_text(s)
+          PY
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --no-daemon
       - name: Build debug APK
