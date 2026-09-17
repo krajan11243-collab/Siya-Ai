@@ -224,9 +224,10 @@ class SiyaVoiceService : Service() {
     private fun initializeVadIfInstalled() {
         if (vad != null && vadProcessor != null) return
         val store = VadModelStore(this)
+        store.restoreFromShared()
         if (!store.isInstalled()) return
         runCatching {
-            val engine = SileroVadEngine(store.readBytes())
+            val engine = SileroVadEngine(store.modelFile.absolutePath)
             vad = engine
             vadProcessor = VadPcmProcessor(engine)
         }.onFailure { error ->
