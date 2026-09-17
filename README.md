@@ -10,67 +10,32 @@
 - Local model execution; no mandatory cloud AI server
 - Foreground voice service with explicit microphone permission
 - Dynamic model loading/unloading for memory efficiency
-- Streaming responses and barge-in support planned
+- Streaming audio output and coordinated barge-in cancellation
 
 ## Build roadmap
 
-The project is implemented in 10 controlled parts. Current milestone: **Part 5 — Local LLM Brain**.
+The project is implemented in 10 controlled parts. Current work: **Part 6 — Local TTS + Part 7 — Full Duplex**.
 
 1. Android foundation
 2. Audio engine
-3. Silero VAD
+3. VAD
 4. Hindi STT
-5. Local LLM brain ← **current**
+5. Local LLM brain
 6. Local TTS
-7. Full-duplex conversation
+7. Full duplex conversation
 8. Android agent actions
 9. Background/resource manager
-10. Security, performance and production hardening
+10. Security/production hardening
 
-## Local engine layer
+## Part 6/7 status
 
-1. Silero VAD (ONNX)
-2. Sherpa-ONNX STT
-3. Quantized Qwen GGUF through llama.cpp
-4. Local TTS engine
+- Local TTS facade with Sherpa-ONNX Kokoro adapter and Android local-TTS fallback
+- Cancellable Float-PCM -> AudioTrack output queue
+- Sentence/phrase chunking and producer cancellation
+- Duplex state phases: listening, thinking, speaking and interrupting
+- LLM turn-generation guard and barge-in invalidation
+- Per-turn timeout and recovery path
 
-### Part 5 status
+The neural Kokoro model is intentionally not committed to Git because model binaries are large. The app checks for an installed local model directory and reports the model/version status.
 
-The Android-side LLM boundary is now in place:
-
-- `agent/llm/LlamaJni.kt` — native llama.cpp boundary
-- `agent/llm/LlmConfig.kt` — mobile runtime configuration
-- `agent/llm/PromptFormatter.kt` — Siya prompt/chat-template boundary
-- `agent/llm/LocalLlmEngine.kt` — load/generate/cancel/unload lifecycle
-- `agent/llm/LocalModelManager.kt` — local model path and state
-- `docs/PART_05_LOCAL_LLM.md` — implementation and acceptance plan
-
-The actual GGUF binary and native llama.cpp `.so` files are **not** committed to Git. They will be supplied through the model-pack/native build workflow. This keeps the repository lightweight and avoids pretending that the native runtime is already bundled.
-
-## Model path
-
-```text
-<app filesDir>/models/llm/qwen2.5-1.5b-instruct-q4_k_m.gguf
-```
-
-## Project structure
-
-```text
-Siya-Ai/
-├── app/
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── java/com/siya/ai/
-│       │   ├── MainActivity.kt
-│       │   ├── agent/llm/
-│       │   ├── service/SiyaVoiceService.kt
-│       │   └── ui/SiyaApp.kt
-│       └── res/
-├── docs/
-│   └── PART_05_LOCAL_LLM.md
-├── build.gradle.kts
-├── settings.gradle.kts
-└── gradle.properties
-```
-
-This repository is the clean starting point for Siya Ai. Older Aura/FFX project code is intentionally not used here.
+[model-hub] CI marker: model-hub rewrite workflows are legacy and must not modify current UI files.
