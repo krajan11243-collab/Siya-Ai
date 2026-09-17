@@ -10,14 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fix remaining Compose Surface arguments
+      - name: Fix remaining Surface overload ambiguity
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app/src/main/java/com/siya/ai/ui/SiyaResponsiveApp.kt')
           s = p.read_text()
-          s = s.replace(',Panel,BorderStroke(', ',Panel,border=BorderStroke(')
-          s = s.replace(', Panel, BorderStroke(', ', Panel, border=BorderStroke(')
+          s = s.replace('Surface(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),Panel,border=BorderStroke(1.dp,Cyan.copy(.35f)))', 'Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Panel, border = BorderStroke(1.dp, Cyan.copy(.35f)))')
+          s = s.replace('Surface(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),Panel,border=BorderStroke(1.dp,Blue.copy(.4f)))', 'Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Panel, border = BorderStroke(1.dp, Blue.copy(.4f)))')
+          s = s.replace('Surface(Modifier.fillMaxWidth().height(118.dp).clickable(onClick=onClick),RoundedCornerShape(20.dp),Panel,border=BorderStroke(1.dp,accent.copy(.9f)))', 'Surface(modifier = Modifier.fillMaxWidth().height(118.dp).clickable(onClick = onClick), shape = RoundedCornerShape(20.dp), color = Panel, border = BorderStroke(1.dp, accent.copy(.9f)))')
           p.write_text(s)
           PY
           git diff --check
@@ -27,5 +28,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/com/siya/ai/ui/SiyaResponsiveApp.kt
           git diff --cached --quiet && exit 0
-          git commit -m "[model-fix] correct remaining Surface border arguments"
+          git commit -m "[model-fix] fully qualify model hub Surface parameters"
           git push
