@@ -2,11 +2,11 @@ package com.siya.ai.llm
 
 import kotlin.math.min
 
-/** Device-adaptive defaults for short, low-latency voice/chat turns. */
+/** Device-adaptive defaults for concise but complete voice/chat turns. */
 data class LlmConfig(
-    val contextSize: Int = 512,
+    val contextSize: Int = 2048,
     val threads: Int = min(Runtime.getRuntime().availableProcessors().coerceAtLeast(2), 6),
-    val maxTokens: Int = 12,
+    val maxTokens: Int = 256,
     val temperature: Float = 0.25f,
     val topP: Float = 0.9f,
 ) {
