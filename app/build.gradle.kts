@@ -44,11 +44,16 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // Ship exactly one ONNX Runtime. Sherpa-ONNX's AAR also contains its
+        // own libonnxruntime.so; picking that copy caused OrtGetApiBase symbol
+        // mismatches with onnxruntime4j_jni.so on real devices. The Microsoft
+        // Maven runtime below is the single shared runtime for both Java ORT
+        // and Sherpa native code.
         jniLibs {
-            pickFirsts += "lib/arm64-v8a/libonnxruntime.so"
-            pickFirsts += "lib/armeabi-v7a/libonnxruntime.so"
-            pickFirsts += "lib/x86/libonnxruntime.so"
-            pickFirsts += "lib/x86_64/libonnxruntime.so"
+            excludes += "lib/arm64-v8a/libonnxruntime.so"
+            excludes += "lib/armeabi-v7a/libonnxruntime.so"
+            excludes += "lib/x86/libonnxruntime.so"
+            excludes += "lib/x86_64/libonnxruntime.so"
         }
     }
 }
@@ -69,10 +74,9 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.2")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    // Sherpa-ONNX 1.13.8 is the current Android release and bundles its
-    // matching ONNX Runtime native runtime (1.28.2). Keep the Java API aligned
-    // with the closest published Maven Central Android runtime for compilation.
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.28.0")
+    // Current published Microsoft Android runtime; Sherpa-ONNX v1.13.8 was
+    // built against the same ORT family and the bundled duplicate is excluded above.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.29.0")
     implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8")
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
     testImplementation("junit:junit:4.13.2")
