@@ -62,22 +62,18 @@ class LocalTtsEngine(
         }
     }
 
-    /** Starts a single generation so streamed sentence chunks are appended instead of replacing audio. */
     @Synchronized
     fun beginStreaming() {
         stop()
-        if (neural.isInstalled()) {
-            streamingGeneration = neural.startGeneration(settings.speechRate)
-        }
+        if (neural.isInstalled()) streamingGeneration = neural.startGeneration(settings.speechRate)
     }
 
-    /** Appends one already-complete sentence/phrase to the current spoken reply. */
+    /** Queues one sentence/phrase into the same cancellable reply generation. */
     @Synchronized
     fun streamChunk(text: String): Boolean {
         if (text.isBlank()) return true
         if (neural.isInstalled()) {
             val generation = streamingGeneration ?: neural.startGeneration(settings.speechRate).also { streamingGeneration = it }
-            if (neuralJob?.isDone == false) return false
             neuralJob = worker.submit {
                 runCatching { neural.generateChunk(text.trim(), generation, settings.speechRate) }
                     .onFailure { onReady(false) }
