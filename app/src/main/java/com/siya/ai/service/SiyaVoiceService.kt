@@ -13,6 +13,9 @@ import android.os.HandlerThread
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.siya.ai.agent.AgentActionExecutor
+import com.siya.ai.agent.AgentIntentRouter
+import com.siya.ai.agent.RoutedIntent
 import com.siya.ai.audio.AudioEngine
 import com.siya.ai.llm.LlmExecutor
 import com.siya.ai.llm.LlmModelStore
@@ -27,7 +30,7 @@ import com.siya.ai.vad.VadModelStore
 import com.siya.ai.vad.VadPcmProcessor
 import com.siya.ai.vad.VadState
 
-/** Foreground host for the local full-duplex VAD -> STT -> LLM -> TTS conversation loop. */
+/** Foreground host for the local full-duplex VAD -> STT -> action/LLM -> TTS loop. */
 class SiyaVoiceService : Service() {
     companion object {
         private const val CHANNEL_ID = "siya_voice"
@@ -45,10 +48,13 @@ class SiyaVoiceService : Service() {
     private var llmExecutor: LlmExecutor? = null
     private var tts: LocalTtsEngine? = null
     private var turnTimeout: Runnable? = null
+    private lateinit var actionExecutor: AgentActionExecutor
+    private var pendingConfirmation: RoutedIntent? = null
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        actionExecutor = AgentActionExecutor(this)
         startForeground(NOTIFICATION_ID, buildNotification("Preparing offline voice models"))
         startVadWorker()
         tts = runCatching { LocalTtsEngine(this) }.getOrNull()
@@ -140,28 +146,78 @@ class SiyaVoiceService : Service() {
             val executor = SttExecutor { HindiSttEngine(store) }
             sttExecutor = executor
             sttPipeline = SttPipeline(executor) { result ->
-                result.onSuccess { stt ->
-                    if (stt.text.isNotBlank()) {
-                        VoiceSessionState.thinking(stt.text)
-                        updateNotification("Thinking about: ${stt.text.take(70)}")
-                        startTurnTimeout()
-                        llmExecutor?.submit(stt.text)
-                    } else {
+                result.onSuccess { stt -> handleTranscript(stt.text) }
+                    .onFailure { error ->
                         cancelTurnTimeout()
-                        VoiceSessionState.error("I could not understand the speech")
-                        updateNotification("Speech was not understood")
+                        VoiceSessionState.error(error.message ?: "Hindi STT error")
+                        updateNotification("Hindi STT error")
                     }
-                }.onFailure { error ->
-                    cancelTurnTimeout()
-                    VoiceSessionState.error(error.message ?: "Hindi STT error")
-                    updateNotification("Hindi STT error")
-                }
             }
         }.onFailure { error ->
             sttExecutor?.close()
             sttExecutor = null
             sttPipeline = null
             VoiceSessionState.error("Hindi STT unavailable: ${error.message ?: error.javaClass.simpleName}")
+        }
+    }
+
+    private fun handleTranscript(transcript: String) {
+        if (transcript.isBlank()) {
+            cancelTurnTimeout()
+            VoiceSessionState.error("I could not understand the speech")
+            updateNotification("Speech was not understood")
+            return
+        }
+        val normalized = transcript.trim().lowercase()
+        pendingConfirmation?.let { pending ->
+            when {
+                normalized in setOf("yes", "haan", "ha", "हाँ", "करो", "कर दीजिए") -> {
+                    pendingConfirmation = null
+                    val result = actionExecutor.execute(pending, confirmed = true)
+                    cancelTurnTimeout()
+                    speakActionResult(result.message, result.executed)
+                    return
+                }
+                normalized in setOf("no", "nahi", "nahin", "नहीं", "मत करो", "cancel", "रद्द") -> {
+                    pendingConfirmation = null
+                    cancelTurnTimeout()
+                    speakActionResult("ठीक है, action cancel कर दिया।", true)
+                    return
+                }
+            }
+        }
+
+        val routed = AgentIntentRouter.route(transcript)
+        if (routed != null) {
+            if (routed.confirmationRequired) {
+                pendingConfirmation = routed
+                cancelTurnTimeout()
+                val prompt = "क्या मैं यह action करूँ? पुष्टि के लिए हाँ बोलें, मना करने के लिए नहीं।"
+                VoiceSessionState.speaking(prompt)
+                tts?.speak(prompt)
+                updateNotification("Confirmation required")
+            } else {
+                val result = actionExecutor.execute(routed)
+                cancelTurnTimeout()
+                speakActionResult(result.message, result.executed)
+            }
+            return
+        }
+
+        VoiceSessionState.thinking(transcript)
+        updateNotification("Thinking about: ${transcript.take(70)}")
+        startTurnTimeout()
+        llmExecutor?.submit(transcript)
+    }
+
+    private fun speakActionResult(message: String, success: Boolean) {
+        if (success) {
+            VoiceSessionState.speaking(message)
+            tts?.speak(message)
+            updateNotification(message)
+        } else {
+            VoiceSessionState.error(message)
+            updateNotification(message)
         }
     }
 
@@ -220,7 +276,6 @@ class SiyaVoiceService : Service() {
                     sttPipeline?.onVad(result)
                     when (result.event?.type) {
                         VadEventType.SPEECH_START -> {
-                            // Part 7 barge-in: invalidate both the spoken-audio producer and the LLM turn.
                             VoiceSessionState.interrupting()
                             cancelTurnTimeout()
                             llmExecutor?.cancelCurrent()
@@ -245,6 +300,7 @@ class SiyaVoiceService : Service() {
 
     override fun onDestroy() {
         cancelTurnTimeout()
+        pendingConfirmation = null
         tts?.stop()
         tts?.close()
         tts = null
