@@ -27,10 +27,16 @@ jobs:
               raise SystemExit('Prepared model-hub replacement not found')
           replacement = m.group(1)
           s = src.read_text()
-          if 'import androidx.compose.ui.window.Dialog' not in s:
-              s = s.replace('import androidx.compose.ui.unit.sp\n', 'import androidx.compose.ui.unit.sp\nimport androidx.compose.ui.window.Dialog\n')
+          for line, after in [
+              ('import androidx.compose.foundation.background\n', 'import androidx.compose.foundation.BorderStroke\n'),
+              ('import androidx.compose.ui.graphics.Brush\n', 'import androidx.compose.ui.graphics.Color\n'),
+              ('import androidx.compose.ui.draw.shadow\n', 'import androidx.compose.ui.draw.clip\n'),
+              ('import androidx.compose.ui.window.Dialog\n', 'import androidx.compose.ui.unit.sp\n'),
+          ]:
+              if line not in s:
+                  s = s.replace(after, after + line + '\n')
           start = s.index('@Composable\nprivate fun ResponsiveModels')
-          end = s.index('@Composable\nprivate fun DeviceRequirementsDialog', start)
+          end = s.index('@Composable private fun ModelCard', start)
           src.write_text(s[:start] + replacement + s[end:])
       - name: Commit source update
         shell: bash
