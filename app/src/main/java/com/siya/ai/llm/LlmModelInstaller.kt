@@ -1,6 +1,8 @@
 package com.siya.ai.llm
 
+import com.siya.ai.service.ModelDownloadService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.File
@@ -11,7 +13,34 @@ import java.net.URL
 import java.security.MessageDigest
 
 class LlmModelInstaller(private val store: LlmModelStore) {
+    /**
+     * Starts the persistent foreground-service download and waits for its result.
+     * Closing/reopening the Activity no longer cancels the model transfer.
+     */
     suspend fun download(onProgress: (Long, Long) -> Unit = { _, _ -> }) = withContext(Dispatchers.IO) {
+        if (store.restoreFromShared()) {
+            onProgress(store.modelFile.length(), store.modelFile.length())
+            return@withContext
+        }
+        val prefs = ModelDownloadService.prefs(store.appContext)
+        if (!prefs.getBoolean(ModelDownloadService.KEY_ACTIVE, false)) {
+            prefs.edit().remove(ModelDownloadService.KEY_ERROR).apply()
+            ModelDownloadService.startQwen(store.appContext)
+        }
+        while (true) {
+            val done = prefs.getLong(ModelDownloadService.KEY_DONE, 0L)
+            val total = prefs.getLong(ModelDownloadService.KEY_TOTAL, 0L)
+            onProgress(done, total)
+            if (!prefs.getBoolean(ModelDownloadService.KEY_ACTIVE, false)) {
+                if (store.isInstalled()) return@withContext
+                throw IllegalStateException(prefs.getString(ModelDownloadService.KEY_ERROR, null) ?: "Model download failed")
+            }
+            delay(500)
+        }
+    }
+
+    /** Called only by ModelDownloadService; never starts another service. */
+    internal suspend fun downloadDirect(onProgress: (Long, Long) -> Unit = { _, _ -> }) = withContext(Dispatchers.IO) {
         if (store.restoreFromShared()) {
             onProgress(store.modelFile.length(), store.modelFile.length())
             return@withContext
