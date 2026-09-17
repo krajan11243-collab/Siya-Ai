@@ -2,7 +2,7 @@
 
 ## Goal
 
-Connect Hindi STT output to a fully on-device Qwen instruct model through llama.cpp. No API key or cloud inference is required after the model is installed.
+Connect Hindi STT output to a fully on-device Qwen instruct model through llama.cpp. No API key or cloud inference is required for inference after the model is installed.
 
 ## Model
 
@@ -12,59 +12,63 @@ Connect Hindi STT output to a fully on-device Qwen instruct model through llama.
 - Source: `Qwen/Qwen2.5-1.5B-Instruct-GGUF`
 - File: `qwen2.5-1.5b-instruct-q4_k_m.gguf`
 - Expected size: about 1.12 GB
-- SHA-256 is pinned in `LlmModelStore`
+- SHA-256 is pinned in `LlmModelStore` and verified before installation.
 
 The large GGUF is intentionally not committed to Git.
 
 ## Runtime
 
-The Android app uses `dev.ffmpegkit-maintained:llama-android:0.1.1`, a prebuilt llama.cpp Android AAR. The current configuration uses CPU/NEON with `gpuLayers = 0`; GPU acceleration is not claimed until it is separately verified on target hardware.
+The Android app uses `dev.ffmpegkit-maintained:llama-android:0.1.1`, a third-party prebuilt llama.cpp Android AAR. The runtime is CPU-only in this integration (`gpuLayers = 0`). GPU acceleration is not claimed until separately verified on target hardware.
 
 ## Files
 
-- `LlmConfig.kt` — conservative mobile context/thread/generation settings.
-- `LlmModelStore.kt` — app-private model location and integrity contract.
-- `LlmModelInstaller.kt` — first-install download, temporary file, size check, SHA-256 check, atomic rename.
+- `LlmConfig.kt` — mobile-adaptive context/thread/generation settings.
+- `LlmModelStore.kt` — model location and integrity contract, including shared backup/restore support.
+- `LlmModelInstaller.kt` — resumable download, temporary file, size check, SHA-256 check, atomic install, and shared backup.
+- `LlmFastPath.kt` — immediate answers for trivial greetings without invoking the 1.12 GB model.
 - `LocalLlmEngine.kt` — load/complete/release facade over llama.cpp.
-- `LlmExecutor.kt` — serializes local inference because one model session is not thread-safe.
+- `LlmExecutor.kt` — serializes inference and applies the greeting fast path.
 
 ## Pipeline
 
 `AudioRecord → Silero VAD → complete speech segment → Hindi Sherpa-ONNX STT → Qwen2.5 local LLM`
 
-The voice service now forwards successful Hindi STT text to `LlmExecutor`.
+The voice service forwards successful Hindi STT text to `LlmExecutor`.
+
+## Model persistence
+
+The working copy is kept in app storage for llama.cpp. A user-visible backup is also maintained under `Download/Siya Ai/Models/LLM/` through Android MediaStore on supported Android versions. This allows the model to be restored after app-data loss/reinstall without unrestricted filesystem access. The app does not require `MANAGE_EXTERNAL_STORAGE` for this feature.
 
 ## Network boundary
 
-`INTERNET` is present only because the first-time model installer downloads the GGUF. Once the model is installed, llama.cpp loads it from the app-private filesystem and inference does not require network access.
+`INTERNET` is required only for first-time model download/import workflows. Once the GGUF is present locally, llama.cpp inference itself does not require network access.
 
-## Memory policy
+## Low-latency defaults
 
-Defaults:
+Current defaults are intentionally conservative for short voice turns:
 
-- context: 2048 tokens
-- CPU threads: 4
-- max output: 256 tokens
-- temperature: 0.7
+- context: 512 tokens
+- CPU threads: up to 6, based on available processors
+- max output: 12 tokens
+- temperature: 0.25
 - top-p: 0.9
+- top-k: 40
 - GPU layers: 0
 
-The Q4_K_M file is about 1.12 GB, but runtime RAM usage is device-dependent. These values must be benchmarked on real phones before production tuning.
+A warm-up path loads the model before the first voice turn when the model is installed. Trivial greetings use the fast path and do not wait for GGUF generation. Actual generation latency remains device-dependent and is not guaranteed to be a fixed number of seconds.
 
-## Verification status
+## Verification gate
 
-**Code integration: implemented.**
+Part 5 is considered build-verified only when all repository tests pass and the debug APK packages/signs successfully. Real-device GGUF inference still requires a physical-device test with the actual model file; CI cannot prove that because the ~1.12 GB model is not stored in the repository.
 
-**Full verification: pending.** The repository has not yet been successfully built and a real Android device has not yet loaded the GGUF and generated a response. Therefore Part 5 is not marked production-verified.
+Required real-device checks before Part 6:
 
-## Next gate
+1. Install/import the Qwen GGUF and confirm SHA-256 verification.
+2. Load the model successfully on the target Android phone.
+3. Send a normal prompt and receive a local response.
+4. Confirm Hindi STT text reaches the LLM path.
+5. Confirm a simple greeting uses the fast path.
+6. Stop/restart the voice service and confirm model lifecycle remains stable.
+7. Confirm the model is reused after an app update and can be restored from the shared backup after app-data loss.
 
-Before Part 6, build the complete app and test:
-
-1. APK/Gradle build.
-2. Model installation and SHA-256 verification.
-3. Qwen model load.
-4. Hindi STT text → Qwen response.
-5. Model release without crash.
-
-Only after these pass should Part 6 begin.
+Only after these checks should Part 6 begin.
