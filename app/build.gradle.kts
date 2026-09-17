@@ -36,9 +36,7 @@ android {
             keyPassword = "siya1234"
         }
     }
-    buildTypes {
-        getByName("debug") { signingConfig = signingConfigs.getByName("ciStableDebug") }
-    }
+    buildTypes { getByName("debug") { signingConfig = signingConfigs.getByName("ciStableDebug") } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
@@ -50,7 +48,7 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
     implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.activity:activity-compose:1.10.0")
+    implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.compose.ui:ui")
@@ -61,9 +59,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.2")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    // Sherpa provides the matching ONNX runtime + JNI stack used by VAD/STT/TTS.
     implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8")
-    // Open-source llama.cpp Android binding with real Kotlin Flow token streaming.
     implementation("org.codeshipping:llama-kotlin-android:0.1.0")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
