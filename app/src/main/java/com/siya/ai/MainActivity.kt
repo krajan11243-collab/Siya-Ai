@@ -15,7 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import com.siya.ai.service.SiyaVoiceService
-import com.siya.ai.ui.SiyaResponsiveApp
+import com.siya.ai.ui.SiyaResponsiveAppV2
 
 class MainActivity : ComponentActivity() {
     private var microphoneGranted by mutableStateOf(false)
@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
 
         setContent {
-            SiyaResponsiveApp(
+            SiyaResponsiveAppV2(
                 microphoneGranted = microphoneGranted,
                 onRequestPermissions = ::requestRequiredPermissions,
                 onStartVoice = ::startVoiceService,
