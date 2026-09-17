@@ -32,12 +32,17 @@ class LlmExecutor(
     fun submit(prompt: String) {
         if (closed.get()) return
         scope.launch {
-            val result = runCatching {
-                val loaded = engine ?: engineFactory().also {
-                    it.load()
-                    engine = it
+            val fast = LlmFastPath.answer(prompt)
+            val result = if (fast != null) {
+                Result.success(LlmResult(text = fast, tokensPerSecond = Float.POSITIVE_INFINITY))
+            } else {
+                runCatching {
+                    val loaded = engine ?: engineFactory().also {
+                        it.load()
+                        engine = it
+                    }
+                    loaded.complete(prompt)
                 }
-                loaded.complete(prompt)
             }
             onResult(result)
         }
