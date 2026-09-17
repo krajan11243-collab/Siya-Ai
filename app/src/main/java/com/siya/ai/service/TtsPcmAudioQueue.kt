@@ -7,10 +7,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
-/**
- * Part 6 PCM output queue. TTS backends produce normalized Float PCM and this class
- * owns AudioTrack playback, queueing and hard cancellation.
- */
+/** Part 6 PCM output queue with generation-based hard cancellation. */
 class TtsPcmAudioQueue : AutoCloseable {
     private data class Chunk(val samples: FloatArray, val sampleRate: Int, val generation: Long)
 
@@ -57,22 +54,32 @@ class TtsPcmAudioQueue : AutoCloseable {
                 if (closed.get()) return
                 continue
             }
+
+            var stale = false
             synchronized(lock) {
-                if (chunk.generation != generation) continue
-                try {
-                    ensureTrackLocked(chunk.sampleRate)
-                } catch (_: Throwable) {
-                    queue.clear()
-                    continue
+                if (chunk.generation != generation) {
+                    stale = true
+                } else {
+                    try {
+                        ensureTrackLocked(chunk.sampleRate)
+                    } catch (_: Throwable) {
+                        queue.clear()
+                        stale = true
+                    }
                 }
             }
-            val pcm = FloatArray(chunk.samples.size) { (chunk.samples[it].coerceIn(-1f, 1f) * 32767f).roundToInt().toShort().toFloat() }
-            val shorts = ShortArray(pcm.size) { pcm[it].toInt().toShort() }
+            if (stale) continue
+
+            val shorts = ShortArray(chunk.samples.size) {
+                (chunk.samples[it].coerceIn(-1f, 1f) * 32767f).roundToInt().toShort()
+            }
             var offset = 0
+            var cancelled = false
             while (offset < shorts.size && !closed.get()) {
                 synchronized(lock) {
-                    if (chunk.generation != generation) break
+                    if (chunk.generation != generation) cancelled = true
                 }
+                if (cancelled) break
                 val written = try {
                     track?.write(shorts, offset, shorts.size - offset, AudioTrack.WRITE_BLOCKING) ?: -1
                 } catch (_: Throwable) {
