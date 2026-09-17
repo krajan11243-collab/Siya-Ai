@@ -3,11 +3,15 @@ package com.siya.ai.service
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
- * Part 6 supported local TTS adapter.
- * Uses the device-local Android TTS engine today; its lifecycle and text chunking
- * are isolated so a Kokoro/Sherpa neural backend can plug in without changing the voice service.
+ * Part 6 local TTS facade.
+ *
+ * Preferred backend: installed Sherpa-ONNX Kokoro -> Float PCM -> AudioTrack queue.
+ * Fallback: Android's device-local TTS engine, still offline when its language data is local.
  */
 class LocalTtsEngine(
     context: Context,
@@ -15,6 +19,13 @@ class LocalTtsEngine(
 ) : TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
     private val settings = TtsSettingsStore.load(appContext)
+    private val ttsStore = TtsModelStore(appContext)
+    private val audioQueue = TtsPcmAudioQueue()
+    private val neural = SherpaKokoroTtsEngine(ttsStore, audioQueue)
+    private val worker: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "Siya-TTS-Producer").apply { priority = Thread.NORM_PRIORITY }
+    }
+    private var neuralJob: Future<*>? = null
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
     @Volatile private var ready = false
 
@@ -29,12 +40,35 @@ class LocalTtsEngine(
                 tts?.setLanguage(Locale.US)
             }
         }
-        onReady(ready)
+        onReady(ready || neural.isInstalled())
+    }
+
+    fun isReady(): Boolean = ready || neural.isInstalled()
+
+    fun isNeuralModelInstalled(): Boolean = neural.isInstalled()
+
+    fun voiceModelVersion(): String = if (neural.isInstalled()) {
+        TtsModelStore.MODEL_VERSION
+    } else {
+        "Android local TTS fallback"
     }
 
     @Synchronized
     fun speak(text: String) {
-        if (!ready || text.isBlank()) return
+        if (text.isBlank()) return
+        stop()
+        if (neural.isInstalled()) {
+            neuralJob = worker.submit {
+                runCatching {
+                    val generation = neural.startGeneration(settings.speechRate)
+                    chunkText(text).forEach { chunk ->
+                        if (!neural.generateChunk(chunk, generation, settings.speechRate)) return@submit
+                    }
+                }.onFailure { onReady(false) }
+            }
+            return
+        }
+        if (!ready) return
         chunkText(text).forEachIndexed { index, chunk ->
             tts?.speak(
                 chunk,
@@ -43,6 +77,14 @@ class LocalTtsEngine(
                 "siya-${System.nanoTime()}-$index"
             )
         }
+    }
+
+    @Synchronized
+    fun stop() {
+        neuralJob?.cancel(true)
+        neuralJob = null
+        neural.stopGeneration()
+        tts?.stop()
     }
 
     /** Pure chunking helper, kept public for Part 6 acceptance tests. */
@@ -54,15 +96,10 @@ class LocalTtsEngine(
                 .filter { it.isNotEmpty() }
     }
 
-    @Synchronized
-    fun stop() {
-        tts?.stop()
-    }
-
-    fun isReady(): Boolean = ready
-
     fun close() {
         stop()
+        neural.close()
+        worker.shutdownNow()
         tts?.shutdown()
         tts = null
         ready = false
