@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.siya.ai.llm.LlmModelInstaller
 import com.siya.ai.llm.LlmModelStore
 import com.siya.ai.llm.LocalLlmEngine
@@ -118,25 +119,98 @@ private fun ResponsiveChat(onBack: () -> Unit, onModels: () -> Unit) {
 
 @Composable
 private fun ResponsiveModels(onBack: () -> Unit) {
-    val context = LocalContext.current; val scope = rememberCoroutineScope(); val llmStore = remember { LlmModelStore(context) }; val vadStore = remember { VadModelStore(context) }; val sttStore = remember { SttModelStore(context) }; val installer = remember { VoiceModelInstaller(vadStore, sttStore) }
-    var llmInstalled by remember { mutableStateOf(llmStore.isInstalled()) }; var vadInstalled by remember { mutableStateOf(vadStore.isInstalled()) }; var sttInstalled by remember { mutableStateOf(sttStore.isInstalled()) }; var busy by remember { mutableStateOf(false) }; var status by remember { mutableStateOf<String?>(null) }; var error by remember { mutableStateOf<String?>(null) }; var done by remember { mutableLongStateOf(0L) }; var total by remember { mutableLongStateOf(0L) }; var requirements by remember { mutableStateOf(false) }
-    val prefs = remember { ModelDownloadService.prefs(context) }; var downloadActive by remember { mutableStateOf(prefs.getBoolean(ModelDownloadService.KEY_ACTIVE, false)) }
-    LaunchedEffect(Unit) { while (true) { downloadActive = prefs.getBoolean(ModelDownloadService.KEY_ACTIVE, false); done = prefs.getLong(ModelDownloadService.KEY_DONE, 0L); total = prefs.getLong(ModelDownloadService.KEY_TOTAL, 0L); if (downloadActive) busy = true; if (!downloadActive && llmStore.isInstalled()) llmInstalled = true; delay(500) } }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? -> if (uri != null) scope.launch { busy = true; error = null; try { importModel(context, uri, llmStore); llmInstalled = true; status = "Qwen model imported and verified" } catch (e: Exception) { error = e.message ?: "Import failed" } finally { busy = false } } }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val llmStore = remember { LlmModelStore(context) }
+    val vadStore = remember { VadModelStore(context) }
+    val sttStore = remember { SttModelStore(context) }
+    val installer = remember { VoiceModelInstaller(vadStore, sttStore) }
+    var llmInstalled by remember { mutableStateOf(llmStore.isInstalled()) }
+    var vadInstalled by remember { mutableStateOf(vadStore.isInstalled()) }
+    var sttInstalled by remember { mutableStateOf(sttStore.isInstalled()) }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var done by remember { mutableLongStateOf(0L) }
+    var total by remember { mutableLongStateOf(0L) }
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    var showSpeech by rememberSaveable { mutableStateOf(false) }
+    var requirements by rememberSaveable { mutableStateOf(false) }
+    val prefs = remember { ModelDownloadService.prefs(context) }
+    var downloadActive by remember { mutableStateOf(prefs.getBoolean(ModelDownloadService.KEY_ACTIVE, false)) }
+    val models = remember { listOf(
+        "GPT-4o Mini" to "Cloud • not offline", "GPT-4o" to "Cloud • not offline",
+        "Gemini 1.5 Flash" to "Cloud • not offline", "Gemini 1.5 Pro" to "Cloud • not offline",
+        "Llama 3.2 1B" to "~1 GB • 4 GB RAM+", "Llama 3.1 8B" to "~4.7 GB • 8 GB RAM+",
+        "Qwen 2.5 0.5B" to "~0.5 GB • 3 GB RAM+", "Qwen 2.5 1.5B" to "~1.12 GB • 4 GB RAM+",
+        "DeepSeek Coder 1.3B" to "~1.3 GB • 4 GB RAM+", "DeepSeek Chat 7B" to "~4.1 GB • 8 GB RAM+",
+        "Mistral 7B Instruct" to "~4 GB • 8 GB RAM+", "Mixtral 8x7B" to "~26 GB • 24 GB RAM+",
+        "Phi-3 Mini" to "~2.4 GB • 6 GB RAM+", "Phi-3 Medium" to "~5.6 GB • 12 GB RAM+",
+        "Yi 1.5 6B" to "~3.9 GB • 8 GB RAM+"
+    ) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            downloadActive = prefs.getBoolean(ModelDownloadService.KEY_ACTIVE, false)
+            done = prefs.getLong(ModelDownloadService.KEY_DONE, 0L)
+            total = prefs.getLong(ModelDownloadService.KEY_TOTAL, 0L)
+            if (!downloadActive && llmStore.isInstalled()) llmInstalled = true
+            delay(500)
+        }
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) scope.launch { busy = true; error = null; try { importModel(context, uri, llmStore); llmInstalled = true; status = "Qwen GGUF imported and verified" } catch(e:Exception) { error = e.message ?: "Import failed" } finally { busy = false } }
+    }
+    if (showAll) {
+        Dialog(onDismissRequest = { showAll = false }) {
+            Surface(Modifier.fillMaxSize().padding(8.dp), RoundedCornerShape(24.dp), Bg) {
+                Column(Modifier.fillMaxSize().padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) { IconButton({ showAll = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }; Column(Modifier.weight(1f)) { Text("AI All Model Download Select", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold); Text("Choose and download AI models for offline use", color = Muted, fontSize = 10.sp) } }
+                    LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        itemsIndexed(models) { _, m ->
+                            Surface(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), Panel, BorderStroke(1.dp, if (m.first == "Qwen 2.5 1.5B") Purple.copy(.7f) else Color.White.copy(.08f))) {
+                                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Memory, null, tint = if (m.first.contains("Qwen")) Purple else Cyan, modifier = Modifier.size(28.dp)); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(m.first, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold); Text(m.second, color = Muted, fontSize = 9.sp) }
+                                    if (m.first == "Qwen 2.5 1.5B") Button({ ModelDownloadService.startQwen(context) }, contentPadding = PaddingValues(horizontal = 9.dp), shape = RoundedCornerShape(10.dp)) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(3.dp)); Text(if (downloadActive) "Downloading" else "Download", fontSize = 8.sp) } else Text(if (m.first.startsWith("GPT") || m.first.startsWith("Gemini")) "Cloud" else "Catalog", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                    Text("Cloud names are catalog examples. Download is enabled only where a real local GGUF/runtime source is wired; no fake offline download is shown.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(4.dp))
+                }
+            }
+        }
+        return
+    }
+    if (showSpeech) {
+        Dialog(onDismissRequest = { showSpeech = false }) {
+            Surface(Modifier.fillMaxSize().padding(8.dp), RoundedCornerShape(24.dp), Bg) {
+                Column(Modifier.fillMaxSize().padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) { IconButton({ showSpeech = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }; Column { Text("Download Speech Models", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text("VAD, Hindi STT and related models", color = Muted, fontSize = 10.sp) } }
+                    Spacer(Modifier.height(12.dp)); ModelCard("Silero VAD", "16 kHz • on-device speech detection", vadInstalled, Cyan); Spacer(Modifier.height(8.dp)); ModelCard("Hindi STT", "IndicConformer • Hindi • Offline", sttInstalled, Blue); Spacer(Modifier.height(12.dp))
+                    Button({ scope.launch { busy = true; try { if (!vadInstalled) { installer.downloadVad { d,t -> done=d; total=t }; vadInstalled=true }; if (!sttInstalled) { installer.downloadHindiStt { d,t -> done=d; total=t }; sttInstalled=true }; status="All speech models ready" } catch(e:Exception) { error=e.message ?: "Speech download failed" } finally { busy=false } } }, Modifier.fillMaxWidth().height(52.dp), enabled=!busy, shape=RoundedCornerShape(14.dp)) { Icon(Icons.Default.Download,null); Spacer(Modifier.width(7.dp)); Text(if(busy) "Downloading…" else "Download All Speech Models (One Click)", fontWeight=FontWeight.Bold) }
+                }
+            }
+        }
+        return
+    }
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).verticalScroll(rememberScrollState()).padding(18.dp)) {
         PageHeader("AI Models", onBack)
-        OutlinedButton(onClick = { requirements = true }, modifier = Modifier.fillMaxWidth().height(46.dp), shape = RoundedCornerShape(14.dp)) { Icon(Icons.Default.Memory, null); Spacer(Modifier.width(7.dp)); Text("Device Requirements") }
-        Spacer(Modifier.height(10.dp)); ModelCard("Qwen 2.5 1.5B Instruct", "Q4_K_M • ~1.12 GB • Local LLM", llmInstalled, Purple); Spacer(Modifier.height(8.dp)); ModelCard("Silero VAD", "16 kHz • On-device speech detection", vadInstalled, Cyan); Spacer(Modifier.height(8.dp)); ModelCard("Hindi STT", "IndicConformer • Hindi • Offline", sttInstalled, Blue); Spacer(Modifier.height(12.dp))
-        if (downloadActive || (busy && total > 0L)) { val percent = if (total > 0L) ((done.toDouble() / total.toDouble()) * 100.0).toInt().coerceIn(0, 100) else 0; Text("Qwen download: $percent%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold); Text("${mb(done)} / ${if (total > 0L) mb(total) else "calculating…"}", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 2.dp)); LinearProgressIndicator(progress = { if (total > 0L) (done.toFloat() / total).coerceIn(0f, 1f) else 0f }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), color = Cyan); Spacer(Modifier.height(8.dp)) }
-        Button(onClick = { scope.launch { busy = true; error = null; done = 0; total = 0; try { LlmModelInstaller(llmStore).download { d, t -> done = d; total = t }; llmInstalled = true; status = "Qwen ready • model verified" } catch (e: Exception) { error = e.message ?: "Download failed" } finally { busy = false } } }, modifier = Modifier.fillMaxWidth().height(50.dp), enabled = !llmInstalled && !downloadActive, shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple)) { Icon(if (downloadActive) Icons.Default.Sync else Icons.Default.Download, null); Spacer(Modifier.width(7.dp)); Text(if (downloadActive) "Qwen Downloading…" else if (llmInstalled) "Qwen Installed" else "Download Qwen Model", fontWeight = FontWeight.Bold) }
-        Spacer(Modifier.height(8.dp)); OutlinedButton(onClick = { launcher.launch(arrayOf("application/octet-stream", "application/*")) }, modifier = Modifier.fillMaxWidth().height(48.dp), enabled = !busy, shape = RoundedCornerShape(15.dp)) { Icon(Icons.Default.FolderOpen, null); Spacer(Modifier.width(7.dp)); Text("Import Qwen GGUF") }
-        Spacer(Modifier.height(8.dp)); OutlinedButton(onClick = { scope.launch { busy = true; error = null; done = 0; total = 0; try { if (!vadInstalled) { installer.downloadVad { d, t -> done = d; total = t }; vadInstalled = true }; if (!sttInstalled) { installer.downloadHindiStt { d, t -> done = d; total = t }; sttInstalled = true }; status = "Voice models ready" } catch (e: Exception) { error = e.message ?: "Voice model download failed" } finally { busy = false } } }, modifier = Modifier.fillMaxWidth().height(48.dp), enabled = !busy && (!vadInstalled || !sttInstalled), shape = RoundedCornerShape(15.dp)) { Icon(Icons.Default.RecordVoiceOver, null); Spacer(Modifier.width(7.dp)); Text(if (vadInstalled && sttInstalled) "Voice Models Installed" else "Download VAD + Hindi STT") }
-        status?.let { Text(it, Modifier.padding(top = 9.dp), color = Cyan, fontSize = 10.sp) }; error?.let { Text(it, Modifier.padding(top = 7.dp), color = Color(0xFFFF7187), fontSize = 10.sp) }
-        Spacer(Modifier.height(14.dp)); Text("Qwen download runs in a foreground service and continues while Siya Ai is closed. Progress stays in the notification.", color = Muted, fontSize = 10.sp); Spacer(Modifier.height(12.dp)); Text("Voice pipeline", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text("Microphone → VAD → Hindi STT → Qwen → TTS", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+        Text("Download, Select & Use On-Device Models", color=Color.White.copy(.8f), fontSize=12.sp, modifier=Modifier.padding(start=58.dp,bottom=12.dp))
+        ModelHubCard("AI All Model Download Select","Download all required models for complete AI voice assistant experience",Purple,Icons.Default.Memory){showAll=true}
+        Spacer(Modifier.height(10.dp)); ModelHubCard("Download Speech Models","Download VAD, STT and all related models (One Click)",Cyan,Icons.Default.GraphicEq){showSpeech=true}
+        Spacer(Modifier.height(10.dp)); ModelHubCard("Import GGUF","Select and import your own model file",Purple,Icons.Default.FolderOpen){launcher.launch(arrayOf("application/octet-stream","application/*"))}
+        Spacer(Modifier.height(10.dp)); OutlinedButton({requirements=true},Modifier.fillMaxWidth().height(48.dp),RoundedCornerShape(14.dp),BorderStroke(1.dp,Blue.copy(.6f))){Icon(Icons.Default.Memory,null);Spacer(Modifier.width(7.dp));Text("Device Requirements & Download Speed")}
+        Spacer(Modifier.height(12.dp)); ModelCard("Qwen 2.5 1.5B Instruct","Q4_K_M • ~1.12 GB • Local LLM",llmInstalled,Purple); Spacer(Modifier.height(8.dp)); ModelCard("Silero VAD","16 kHz • On-device speech detection",vadInstalled,Cyan); Spacer(Modifier.height(8.dp)); ModelCard("Hindi STT","IndicConformer • Hindi • Offline",sttInstalled,Blue)
+        if(downloadActive || total > 0) { val percent=if(total>0)((done*100)/total).toInt().coerceIn(0,100) else 0; Spacer(Modifier.height(10.dp)); Surface(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),Panel,BorderStroke(1.dp,Cyan.copy(.35f))){Column(Modifier.padding(12.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Download progress",color=Color.White,fontWeight=FontWeight.Bold);Text("$percent%",color=Cyan,fontWeight=FontWeight.Bold)};Text("${mb(done)} / ${if(total>0)mb(total) else "calculating…"}",color=Muted,fontSize=10.sp,modifier=Modifier.padding(top=3.dp));LinearProgressIndicator({if(total>0)done.toFloat()/total else 0f},Modifier.fillMaxWidth().padding(top=6.dp),Cyan)}} }
+        Spacer(Modifier.height(10.dp)); Button({scope.launch{busy=true;try{LlmModelInstaller(llmStore).download{d,t->done=d;total=t};llmInstalled=true;status="Qwen ready • verified"}catch(e:Exception){error=e.message?:"Download failed"}finally{busy=false}}},Modifier.fillMaxWidth().height(50.dp),enabled=!busy&&!llmInstalled&&!downloadActive,RoundedCornerShape(14.dp),ButtonDefaults.buttonColors(containerColor=Purple)){Icon(Icons.Default.Download,null);Spacer(Modifier.width(7.dp));Text(if(downloadActive)"Downloading…"else"Download Qwen Model",fontWeight=FontWeight.Bold)}
+        Spacer(Modifier.height(8.dp)); OutlinedButton({scope.launch{busy=true;try{if(!vadInstalled){installer.downloadVad{d,t->done=d;total=t};vadInstalled=true};if(!sttInstalled){installer.downloadHindiStt{d,t->done=d;total=t};sttInstalled=true};status="Speech models ready"}catch(e:Exception){error=e.message?:"Speech download failed"}finally{busy=false}}},Modifier.fillMaxWidth().height(48.dp),enabled=!busy&&(!vadInstalled||!sttInstalled),RoundedCornerShape(14.dp)){Icon(Icons.Default.RecordVoiceOver,null);Spacer(Modifier.width(7.dp));Text("Download VAD + Hindi STT")}
+        status?.let{Text(it,color=Cyan,fontSize=10.sp,modifier=Modifier.padding(top=8.dp))}; error?.let{Text(it,color=Color(0xFFFF7187),fontSize=10.sp,modifier=Modifier.padding(top=6.dp))}; Spacer(Modifier.height(12.dp)); Surface(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),Panel,BorderStroke(1.dp,Blue.copy(.4f))){Text("Model downloads run in a foreground service and continue while Siya Ai is closed. Progress stays in the notification.",color=Color.White.copy(.82f),fontSize=10.sp,modifier=Modifier.padding(12.dp))}
     }
-    if (requirements) DeviceRequirementsDialog(context) { requirements = false }
+    if(requirements) DeviceRequirementsDialog(context){requirements=false}
 }
 
+@Composable
+private fun ModelHubCard(title:String,subtitle:String,accent:Color,icon:androidx.compose.ui.graphics.vector.ImageVector,onClick:()->Unit){Surface(Modifier.fillMaxWidth().height(118.dp).clickable(onClick=onClick),RoundedCornerShape(20.dp),Panel,BorderStroke(1.dp,accent.copy(.9f))){Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(62.dp),CircleShape,accent.copy(.08f),BorderStroke(1.dp,accent.copy(.65f))){Icon(icon,null,tint=accent,modifier=Modifier.padding(16.dp))};Spacer(Modifier.width(15.dp));Column(Modifier.weight(1f)){Text(title,color=Color.White,fontSize=18.sp,fontWeight=FontWeight.Bold);Text(subtitle,color=Color.White.copy(.72f),fontSize=11.sp,modifier=Modifier.padding(top=5.dp),maxLines=3)};Icon(Icons.Default.ChevronRight,null,tint=accent,modifier=Modifier.size(36.dp))}}}
 @Composable
 private fun DeviceRequirementsDialog(context: Context, onDismiss: () -> Unit) {
     val activityManager = remember { context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager }
