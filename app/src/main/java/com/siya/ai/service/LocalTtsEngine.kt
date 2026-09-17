@@ -7,12 +7,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
-/**
- * Part 6 local TTS facade.
- *
- * Preferred backend: installed Sherpa-ONNX Kokoro -> Float PCM -> AudioTrack queue.
- * Fallback: Android's device-local TTS engine, still offline when its language data is local.
- */
+/** Part 6 local TTS facade plus Part 7 streaming reply support. */
 class LocalTtsEngine(
     context: Context,
     private val onReady: (Boolean) -> Unit = {},
@@ -26,6 +21,7 @@ class LocalTtsEngine(
         Thread(runnable, "Siya-TTS-Producer").apply { priority = Thread.NORM_PRIORITY }
     }
     private var neuralJob: Future<*>? = null
+    private var streamingGeneration: Long? = null
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
     @Volatile private var ready = false
 
@@ -36,22 +32,14 @@ class LocalTtsEngine(
             tts?.setPitch(settings.pitch)
             val requested = Locale.forLanguageTag(settings.localeTag)
             val result = tts?.setLanguage(requested) ?: TextToSpeech.LANG_NOT_SUPPORTED
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                tts?.setLanguage(Locale.US)
-            }
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) tts?.setLanguage(Locale.US)
         }
         onReady(ready || neural.isInstalled())
     }
 
     fun isReady(): Boolean = ready || neural.isInstalled()
-
     fun isNeuralModelInstalled(): Boolean = neural.isInstalled()
-
-    fun voiceModelVersion(): String = if (neural.isInstalled()) {
-        TtsModelStore.MODEL_VERSION
-    } else {
-        "Android local TTS fallback"
-    }
+    fun voiceModelVersion(): String = if (neural.isInstalled()) TtsModelStore.MODEL_VERSION else "Android local TTS fallback"
 
     @Synchronized
     fun speak(text: String) {
@@ -70,30 +58,53 @@ class LocalTtsEngine(
         }
         if (!ready) return
         chunkText(text).forEachIndexed { index, chunk ->
-            tts?.speak(
-                chunk,
-                if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD,
-                null,
-                "siya-${System.nanoTime()}-$index"
-            )
+            tts?.speak(chunk, if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "siya-${System.nanoTime()}-$index")
         }
+    }
+
+    /** Starts a single generation so streamed sentence chunks are appended instead of replacing audio. */
+    @Synchronized
+    fun beginStreaming() {
+        stop()
+        if (neural.isInstalled()) {
+            streamingGeneration = neural.startGeneration(settings.speechRate)
+        }
+    }
+
+    /** Appends one already-complete sentence/phrase to the current spoken reply. */
+    @Synchronized
+    fun streamChunk(text: String): Boolean {
+        if (text.isBlank()) return true
+        if (neural.isInstalled()) {
+            val generation = streamingGeneration ?: neural.startGeneration(settings.speechRate).also { streamingGeneration = it }
+            if (neuralJob?.isDone == false) return false
+            neuralJob = worker.submit {
+                runCatching { neural.generateChunk(text.trim(), generation, settings.speechRate) }
+                    .onFailure { onReady(false) }
+            }
+            return true
+        }
+        if (!ready) return false
+        tts?.speak(text.trim(), TextToSpeech.QUEUE_ADD, null, "siya-stream-${System.nanoTime()}")
+        return true
+    }
+
+    @Synchronized
+    fun endStreaming() {
+        streamingGeneration = null
     }
 
     @Synchronized
     fun stop() {
         neuralJob?.cancel(true)
         neuralJob = null
+        streamingGeneration = null
         neural.stopGeneration()
         tts?.stop()
     }
 
-    /** Pure chunking helper, kept public for Part 6 acceptance tests. */
     companion object {
-        fun chunkText(text: String): List<String> =
-            text.replace('\n', ' ')
-                .split(Regex("(?<=[.!?।])\\s+"))
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
+        fun chunkText(text: String): List<String> = text.replace('\n', ' ').split(Regex("(?<=[.!?।])\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
     }
 
     fun close() {
