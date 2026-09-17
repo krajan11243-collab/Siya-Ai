@@ -5,24 +5,28 @@ import android.speech.tts.TextToSpeech
 import java.util.Locale
 
 /**
- * Part 6 TTS adapter.
- * Uses the Android device TTS engine as the first local adapter; the interface is
- * intentionally isolated so a Kokoro/Sherpa local backend can replace it later.
+ * Part 6 supported local TTS adapter.
+ * Uses the device-local Android TTS engine today; its lifecycle and text chunking
+ * are isolated so a Kokoro/Sherpa neural backend can plug in without changing the voice service.
  */
 class LocalTtsEngine(
     context: Context,
     private val onReady: (Boolean) -> Unit = {},
 ) : TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
+    private val settings = TtsSettingsStore.load(appContext)
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
-    private var ready = false
+    @Volatile private var ready = false
 
     override fun onInit(status: Int) {
         ready = status == TextToSpeech.SUCCESS
         if (ready) {
-            val result = tts?.setLanguage(Locale.forLanguageTag("hi-IN")) ?: TextToSpeech.LANG_NOT_SUPPORTED
+            tts?.setSpeechRate(settings.speechRate)
+            tts?.setPitch(settings.pitch)
+            val requested = Locale.forLanguageTag(settings.localeTag)
+            val result = tts?.setLanguage(requested) ?: TextToSpeech.LANG_NOT_SUPPORTED
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                tts?.language = Locale.US
+                tts?.setLanguage(Locale.US)
             }
         }
         onReady(ready)
@@ -31,17 +35,23 @@ class LocalTtsEngine(
     @Synchronized
     fun speak(text: String) {
         if (!ready || text.isBlank()) return
-        val chunks = text.replace("\n", " ").split(Regex("(?<=[.!?।])\\s+"))
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-        chunks.forEachIndexed { index, chunk ->
+        chunkText(text).forEachIndexed { index, chunk ->
             tts?.speak(
                 chunk,
                 if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD,
                 null,
-                "siya-$index"
+                "siya-${System.nanoTime()}-$index"
             )
         }
+    }
+
+    /** Pure chunking helper, kept public for Part 6 acceptance tests. */
+    companion object {
+        fun chunkText(text: String): List<String> =
+            text.replace('\n', ' ')
+                .split(Regex("(?<=[.!?।])\\s+"))
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
     }
 
     @Synchronized
