@@ -14,6 +14,7 @@ class LlmModelStore(context: Context) {
         const val MIN_MODEL_BYTES = 1_000_000_000L
     }
 
+    val appContext: Context = context.applicationContext
     private val legacyRoot = File(context.filesDir, "models/llm/qwen2.5-1.5b")
     private val externalRoot = File(
         context.getExternalFilesDir(null) ?: context.filesDir,
