@@ -7,11 +7,7 @@ import android.os.Build
 import android.provider.MediaStore
 import java.io.File
 
-/**
- * Keeps model copies in user-visible Downloads/Siya Ai/Models so an uninstall or
- * app-data reset does not force a multi-GB model download again.
- * Android 10+ uses MediaStore, avoiding MANAGE_EXTERNAL_STORAGE.
- */
+/** Keeps model copies in user-visible Downloads/Siya Ai/Models. */
 class SharedModelBackup(private val context: Context) {
     fun find(fileName: String, relativePath: String): Uri? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
@@ -29,11 +25,16 @@ class SharedModelBackup(private val context: Context) {
         return null
     }
 
+    fun delete(fileName: String, relativePath: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+        val uri = find(fileName, relativePath) ?: return true
+        return context.contentResolver.delete(uri, null, null) > 0
+    }
+
     fun copyToShared(source: File, relativePath: String): Boolean {
         if (!source.isFile || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
         val resolver = context.contentResolver
         val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        // Do not rewrite a valid existing backup on every app start/update.
         if (find(source.name, relativePath) != null) return true
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, source.name)
@@ -43,16 +44,12 @@ class SharedModelBackup(private val context: Context) {
         }
         val uri = resolver.insert(collection, values) ?: return false
         return try {
-            resolver.openOutputStream(uri, "w")!!.use { output ->
-                source.inputStream().use { input -> input.copyTo(output, 1024 * 1024) }
-            }
-            values.clear()
-            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            resolver.openOutputStream(uri, "w")!!.use { output -> source.inputStream().use { input -> input.copyTo(output, 1024 * 1024) } }
+            values.clear(); values.put(MediaStore.MediaColumns.IS_PENDING, 0)
             resolver.update(uri, values, null, null)
             true
         } catch (t: Throwable) {
-            resolver.delete(uri, null, null)
-            false
+            resolver.delete(uri, null, null); false
         }
     }
 
@@ -62,13 +59,9 @@ class SharedModelBackup(private val context: Context) {
         target.parentFile?.mkdirs()
         val temp = File(target.parentFile, "${target.name}.restore")
         return try {
-            context.contentResolver.openInputStream(uri)!!.use { input ->
-                temp.outputStream().use { output -> input.copyTo(output, 1024 * 1024) }
-            }
+            context.contentResolver.openInputStream(uri)!!.use { input -> temp.outputStream().use { output -> input.copyTo(output, 1024 * 1024) } }
             if (temp.length() < minimumBytes) false else temp.renameTo(target)
-        } finally {
-            if (temp.exists()) temp.delete()
-        }
+        } finally { if (temp.exists()) temp.delete() }
     }
 
     companion object {
