@@ -10,16 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fix Compose APIs
+      - name: Fix remaining Compose Surface arguments
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app/src/main/java/com/siya/ai/ui/SiyaResponsiveApp.kt')
           s = p.read_text()
-          s = s.replace('LinearProgressIndicator({if(total>0)done.toFloat()/total else 0f},Modifier.fillMaxWidth().padding(top=6.dp),Cyan)', 'LinearProgressIndicator(progress = if (total > 0) done.toFloat() / total else 0f, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), color = Cyan)')
-          s = s.replace('Button({scope.launch{busy=true;try{LlmModelInstaller(llmStore).download{d,t->done=d;total=t};llmInstalled=true;status="Qwen ready • verified"}catch(e:Exception){error=e.message?:"Download failed"}finally{busy=false}}},Modifier.fillMaxWidth().height(50.dp),enabled=!busy&&!llmInstalled&&!downloadActive,shape=RoundedCornerShape(14.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple))', 'Button(onClick = { scope.launch { busy=true; try { LlmModelInstaller(llmStore).download { d,t -> done=d; total=t }; llmInstalled=true; status="Qwen ready • verified" } catch(e:Exception) { error=e.message ?: "Download failed" } finally { busy=false } } }, modifier = Modifier.fillMaxWidth().height(50.dp), enabled = !busy && !llmInstalled && !downloadActive, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple))')
-          s = s.replace('OutlinedButton({scope.launch{busy=true;try{if(!vadInstalled){installer.downloadVad{d,t->done=d;total=t};vadInstalled=true};if(!sttInstalled){installer.downloadHindiStt{d,t->done=d;total=t};sttInstalled=true};status="Speech models ready"}catch(e:Exception){error=e.message?:"Speech download failed"}finally{busy=false}}},Modifier.fillMaxWidth().height(48.dp),enabled=!busy&&(!vadInstalled||!sttInstalled),shape=RoundedCornerShape(14.dp))', 'OutlinedButton(onClick = { scope.launch { busy=true; try { if(!vadInstalled){ installer.downloadVad { d,t -> done=d; total=t }; vadInstalled=true }; if(!sttInstalled){ installer.downloadHindiStt { d,t -> done=d; total=t }; sttInstalled=true }; status="Speech models ready" } catch(e:Exception) { error=e.message ?: "Speech download failed" } finally { busy=false } } }, modifier = Modifier.fillMaxWidth().height(48.dp), enabled = !busy && (!vadInstalled || !sttInstalled), shape = RoundedCornerShape(14.dp))')
-          s = s.replace('Button({ scope.launch { busy = true; try { if (!vadInstalled) { installer.downloadVad { d,t -> done=d; total=t }; vadInstalled=true }; if (!sttInstalled) { installer.downloadHindiStt { d,t -> done=d; total=t }; sttInstalled=true }; status="All speech models ready" } catch(e:Exception) { error=e.message ?: "Speech download failed" } finally { busy=false } } }, Modifier.fillMaxWidth().height(52.dp), enabled=!busy, shape=RoundedCornerShape(14.dp))', 'Button(onClick = { scope.launch { busy = true; try { if (!vadInstalled) { installer.downloadVad { d,t -> done=d; total=t }; vadInstalled=true }; if (!sttInstalled) { installer.downloadHindiStt { d,t -> done=d; total=t }; sttInstalled=true }; status="All speech models ready" } catch(e:Exception) { error=e.message ?: "Speech download failed" } finally { busy=false } } }, modifier = Modifier.fillMaxWidth().height(52.dp), enabled = !busy, shape = RoundedCornerShape(14.dp))')
+          s = s.replace(',Panel,BorderStroke(', ',Panel,border=BorderStroke(')
+          s = s.replace(', Panel, BorderStroke(', ', Panel, border=BorderStroke(')
           p.write_text(s)
           PY
           git diff --check
@@ -29,5 +27,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/com/siya/ai/ui/SiyaResponsiveApp.kt
           git diff --cached --quiet && exit 0
-          git commit -m "[model-fix] normalize Compose APIs"
+          git commit -m "[model-fix] correct remaining Surface border arguments"
           git push
