@@ -1,10 +1,16 @@
 package com.siya.ai.llm
 
-import dev.ffmpegkit.llama.Llama
-import dev.ffmpegkit.llama.LlamaConfig
-import dev.ffmpegkit.llama.LlamaModel
+import android.util.Log
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collect
+import org.codeshipping.llamakotlin.LlamaConfig as NativeLlamaConfig
+import org.codeshipping.llamakotlin.LlamaModel
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
 
+/** Local GGUF engine with real llama.cpp Flow token streaming. */
 class LocalLlmEngine(
     private val modelStore: LlmModelStore,
     private val config: LlmConfig = LlmConfig(),
@@ -12,24 +18,25 @@ class LocalLlmEngine(
     private val closed = AtomicBoolean(false)
     private var model: LlamaModel? = null
 
-    /** Loads the GGUF model once and restores/backups the model across app-data loss. */
     suspend fun load() {
         check(!closed.get()) { "LocalLlmEngine is closed" }
         if (model != null) return
         modelStore.restoreFromShared()
         modelStore.validate().getOrThrow()
-        model = Llama.loadModel(
-            modelPath = modelStore.modelPath(),
-            config = LlamaConfig(
-                contextSize = config.contextSize,
-                threads = config.threads,
-                gpuLayers = 0,
-                temperature = config.temperature,
-                topP = config.topP,
-                topK = 40,
-            ),
-        )
-        // Existing app-private models are migrated to the shared Siya Ai folder once.
+        model = LlamaModel.load(modelStore.modelPath()) {
+            contextSize = config.contextSize
+            threads = config.threads
+            threadsBatch = config.threads
+            batchSize = 256
+            temperature = config.temperature
+            topP = config.topP
+            topK = 40
+            repeatPenalty = 1.1f
+            maxTokens = config.maxTokens
+            useMmap = true
+            useMlock = false
+            gpuLayers = 0
+        }
         modelStore.backupToShared()
     }
 
@@ -37,22 +44,51 @@ class LocalLlmEngine(
         prompt: String,
         systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
     ): LlmResult {
+        return stream(prompt, systemPrompt) { }
+    }
+
+    /** Streams every generated token. The callback runs on the generation coroutine. */
+    suspend fun stream(
+        prompt: String,
+        systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
+        onToken: (String) -> Unit,
+    ): LlmResult {
         check(!closed.get()) { "LocalLlmEngine is closed" }
         require(prompt.isNotBlank())
         load()
         val loaded = model ?: error("Qwen model could not be loaded")
-        val result = Llama.complete(
-            loaded,
-            prompt = prompt,
-            systemPrompt = systemPrompt,
-            maxTokens = config.maxTokens,
-        )
-        return LlmResult(text = result.text.trim(), tokensPerSecond = result.tokensPerSecond)
+        val formatted = runCatching { buildChatPrompt(loaded, systemPrompt, prompt) }.getOrElse { prompt }
+        val output = StringBuilder()
+        val started = System.nanoTime()
+        var tokenCount = 0
+        loaded.generateStream(formatted).collect { token ->
+            currentCoroutineContext().ensureActive()
+            if (token.isNotEmpty()) {
+                output.append(token)
+                tokenCount++
+                onToken(token)
+            }
+        }
+        val elapsedSeconds = ((System.nanoTime() - started).coerceAtLeast(1L)) / 1_000_000_000.0
+        val tps = if (tokenCount == 0) 0f else (tokenCount / elapsedSeconds).toFloat()
+        return LlmResult(text = output.toString().trim(), tokensPerSecond = tps)
+    }
+
+    fun cancelGeneration() {
+        runCatching { model?.cancelGeneration() }
+    }
+
+    private fun buildChatPrompt(model: LlamaModel, systemPrompt: String, userPrompt: String): String {
+        val messages = JSONArray()
+            .put(JSONObject().put("role", "system").put("content", systemPrompt))
+            .put(JSONObject().put("role", "user").put("content", userPrompt))
+        return model.applyChatTemplate(messages.toString(), addGenerationPrompt = true)
     }
 
     override fun close() {
         if (closed.compareAndSet(false, true)) {
-            model?.let(Llama::releaseModel)
+            cancelGeneration()
+            runCatching { model?.close() }
             model = null
         }
     }
