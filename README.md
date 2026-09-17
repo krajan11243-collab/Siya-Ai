@@ -6,7 +6,7 @@
 
 - Android-first, mobile UI
 - Voice-first interaction
-- VAD -> STT -> LLM -> TTS pipeline
+- VAD -> STT -> action router / LLM -> TTS pipeline
 - Local model execution; no mandatory cloud AI server
 - Foreground voice service with explicit microphone permission
 - Dynamic model loading/unloading for memory efficiency
@@ -14,7 +14,7 @@
 
 ## Build roadmap
 
-The project is implemented in 10 controlled parts. Current work: **Part 6 — Local TTS + Part 7 — Full Duplex**.
+The project is implemented in 10 controlled parts. Current work: **Part 8 — Android agent actions**.
 
 1. Android foundation
 2. Audio engine
@@ -35,6 +35,18 @@ The project is implemented in 10 controlled parts. Current work: **Part 6 — Lo
 - Duplex state phases: listening, thinking, speaking and interrupting
 - LLM turn-generation guard and barge-in invalidation
 - Per-turn timeout and recovery path
+
+## Part 8 status
+
+- Deterministic offline intent router
+- App launcher for supported aliases
+- Media play/pause/next/previous actions
+- Web search and HTTP(S) URL opening
+- Share action executor
+- Call and message actions are confirmation-gated
+- Voice confirmation/cancellation for pending dangerous actions
+- Unknown or malformed commands are not guessed
+- Unit acceptance tests for routing and confirmation requirements
 
 The neural Kokoro model is intentionally not committed to Git because model binaries are large. The app checks for an installed local model directory and reports the model/version status.
 
