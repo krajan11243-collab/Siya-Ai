@@ -1,0 +1,46 @@
+name: Finalize Model Hub UI
+
+on:
+  workflow_run:
+    workflows: ["Android CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply the prepared model-hub screen
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          src = Path('app/src/main/java/com/siya/ai/ui/SiyaResponsiveApp.kt')
+          wf = Path('.github/workflows/apply-model-hub.yml').read_text()
+          m = re.search(r"replacement = r'''(.*?)'''", wf, re.S)
+          if not m:
+              raise SystemExit('Prepared model-hub replacement not found')
+          replacement = m.group(1)
+          s = src.read_text()
+          if 'import androidx.compose.ui.window.Dialog' not in s:
+              s = s.replace('import androidx.compose.ui.unit.sp\n', 'import androidx.compose.ui.unit.sp\nimport androidx.compose.ui.window.Dialog\n')
+          start = s.index('@Composable\nprivate fun ResponsiveModels')
+          end = s.index('@Composable\nprivate fun DeviceRequirementsDialog', start)
+          src.write_text(s[:start] + replacement + s[end:])
+      - name: Commit source update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/siya/ai/ui/SiyaResponsiveApp.kt
+          if git diff --cached --quiet; then
+            echo "Model hub source already matches prepared UI."
+            exit 0
+          fi
+          git commit -m "[model-hub] apply AI model hub redesign"
+          git push
