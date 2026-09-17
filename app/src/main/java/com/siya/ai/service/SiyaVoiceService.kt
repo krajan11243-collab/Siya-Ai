@@ -30,7 +30,7 @@ import com.siya.ai.vad.VadModelStore
 import com.siya.ai.vad.VadPcmProcessor
 import com.siya.ai.vad.VadState
 
-/** Foreground host for the local full-duplex VAD -> STT -> action/LLM -> TTS loop. */
+/** Foreground host for the local full-duplex VAD -> STT -> streaming LLM -> TTS loop. */
 class SiyaVoiceService : Service() {
     companion object {
         private const val CHANNEL_ID = "siya_voice"
@@ -50,6 +50,9 @@ class SiyaVoiceService : Service() {
     private var turnTimeout: Runnable? = null
     private lateinit var actionExecutor: AgentActionExecutor
     private var pendingConfirmation: RoutedIntent? = null
+    private val streamLock = Any()
+    private val streamBuffer = StringBuilder()
+    private var firstTtsChunk = true
 
     override fun onCreate() {
         super.onCreate()
@@ -91,7 +94,7 @@ class SiyaVoiceService : Service() {
                 return START_NOT_STICKY
             }
             VoiceSessionState.listening()
-            updateNotification("Listening • VAD + Hindi STT + local AI + TTS ready")
+            updateNotification("Listening • VAD + Hindi STT + streaming AI + TTS ready")
             START_STICKY
         } catch (error: Throwable) {
             val message = error.message ?: error.javaClass.simpleName
@@ -116,18 +119,18 @@ class SiyaVoiceService : Service() {
         llmExecutor = runCatching {
             LlmExecutor(engineFactory = { LocalLlmEngine(store) }) { result ->
                 result.onSuccess { answer ->
+                    flushLlmTts(answer.text)
+                    cancelTurnTimeout()
                     if (answer.text.isNotBlank()) {
-                        cancelTurnTimeout()
                         VoiceSessionState.speaking(answer.text)
-                        tts?.speak(answer.text)
                         updateNotification("Siya is speaking")
                     } else {
-                        cancelTurnTimeout()
                         VoiceSessionState.error("Siya returned an empty response")
                         updateNotification("Siya returned empty text")
                     }
                 }.onFailure { error ->
                     cancelTurnTimeout()
+                    tts?.stop()
                     VoiceSessionState.error(error.message ?: "Local AI error")
                     updateNotification("Local AI error")
                 }
@@ -204,14 +207,60 @@ class SiyaVoiceService : Service() {
             return
         }
 
+        synchronized(streamLock) {
+            streamBuffer.setLength(0)
+            firstTtsChunk = true
+        }
+        tts?.beginStreaming()
         VoiceSessionState.thinking(transcript)
-        updateNotification("Thinking about: ${transcript.take(70)}")
+        updateNotification("Thinking • streaming local response")
         startTurnTimeout()
-        llmExecutor?.submit(transcript)
+        llmExecutor?.submit(transcript, onToken = ::onLlmToken)
+    }
+
+    private fun onLlmToken(token: String) {
+        if (token.isBlank()) return
+        val chunks = mutableListOf<String>()
+        synchronized(streamLock) {
+            streamBuffer.append(token)
+            while (true) {
+                val end = streamBuffer.indexOfFirst { it == '.' || it == '!' || it == '?' || it == '।' }
+                if (end < 0) {
+                    if (streamBuffer.length < 80) break
+                    val split = streamBuffer.lastIndexOf(' ', 79)
+                    if (split <= 0) break
+                    chunks += streamBuffer.substring(0, split).trim()
+                    streamBuffer.deleteRange(0, split + 1)
+                } else {
+                    chunks += streamBuffer.substring(0, end + 1).trim()
+                    streamBuffer.deleteRange(0, end + 1)
+                    while (streamBuffer.isNotEmpty() && streamBuffer.first().isWhitespace()) streamBuffer.deleteCharAt(0)
+                }
+            }
+        }
+        chunks.filter { it.isNotBlank() }.forEach { chunk ->
+            tts?.streamChunk(chunk)
+            synchronized(streamLock) { firstTtsChunk = false }
+            VoiceSessionState.speaking(chunk)
+        }
+    }
+
+    private fun flushLlmTts(fullText: String) {
+        val remaining: String
+        synchronized(streamLock) {
+            if (streamBuffer.isNotEmpty()) streamBuffer.append(' ')
+            if (fullText.isNotBlank() && streamBuffer.isEmpty()) streamBuffer.append(fullText)
+            remaining = streamBuffer.toString().trim()
+            streamBuffer.setLength(0)
+            firstTtsChunk = false
+        }
+        if (remaining.isNotBlank()) tts?.streamChunk(remaining)
+        tts?.endStreaming()
     }
 
     private fun speakActionResult(message: String, success: Boolean) {
         if (success) {
+            tts?.endStreaming()
             VoiceSessionState.speaking(message)
             tts?.speak(message)
             updateNotification(message)
@@ -251,6 +300,7 @@ class SiyaVoiceService : Service() {
         val timeout = Runnable {
             llmExecutor?.cancelCurrent()
             tts?.stop()
+            synchronized(streamLock) { streamBuffer.setLength(0); firstTtsChunk = true }
             VoiceSessionState.error("This turn timed out. Please try again.")
             updateNotification("Turn timeout — listening again")
             VoiceSessionState.listening()
@@ -281,6 +331,7 @@ class SiyaVoiceService : Service() {
                             cancelTurnTimeout()
                             llmExecutor?.cancelCurrent()
                             tts?.stop()
+                            synchronized(streamLock) { streamBuffer.setLength(0); firstTtsChunk = true }
                             VoiceSessionState.listening()
                             updateNotification("Speech detected • previous turn cancelled")
                         }
