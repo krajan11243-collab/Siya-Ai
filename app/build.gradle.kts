@@ -61,10 +61,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.2")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    // sherpa-onnx v1.13.8 bundles its matching Android ONNX Runtime native library.
-    // Do not add a second Microsoft ORT AAR or pickFirst its .so: that can pair
-    // sherpa's JNI library with an incompatible libonnxruntime and cause
-    // UnsatisfiedLinkError / OrtGetApiBase failures on device.
+    // [model-hub] Keep Sherpa's matching Android ONNX Runtime native library only.
     implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8")
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
     testImplementation("junit:junit:4.13.2")
