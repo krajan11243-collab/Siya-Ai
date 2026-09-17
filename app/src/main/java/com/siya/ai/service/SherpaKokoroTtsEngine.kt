@@ -24,7 +24,6 @@ class SherpaKokoroTtsEngine(
         check(!closed.get()) { "TTS engine is closed" }
         if (tts != null) return
         store.validate().getOrThrow()
-        val dir = store.directory()
         val config = OfflineTtsConfig(
             model = OfflineTtsModelConfig(
                 kokoro = OfflineTtsKokoroModelConfig(
@@ -40,24 +39,29 @@ class SherpaKokoroTtsEngine(
             maxNumSentences = 1,
         )
         tts = OfflineTts(config = config)
-        check(dir.exists()) { "TTS model directory disappeared" }
     }
 
-    /**
-     * Returns the generation id used by the producer. Calling stopGeneration() invalidates
-     * the callback so a sentence that is currently being synthesized cannot enqueue stale audio.
-     */
-    fun speak(text: String, speed: Float = 1.0f): Long {
-        if (text.isBlank() || closed.get()) return audioQueue.currentGeneration()
+    /** Starts one cancellable generation used by all sentence chunks in the reply. */
+    fun startGeneration(speed: Float = 1.0f): Long {
+        check(!closed.get()) { "TTS engine is closed" }
         ensureLoaded()
-        val generation = audioQueue.newGeneration()
-        val generationConfig = GenerationConfig(speed = speed.coerceIn(0.5f, 2.0f), silenceScale = 0.2f)
-        tts!!.generateWithConfigAndCallback(text.trim(), generationConfig) { samples ->
+        return audioQueue.newGeneration()
+    }
+
+    /** Generates one sentence and appends its PCM to the current generation. */
+    fun generateChunk(text: String, generation: Long, speed: Float = 1.0f): Boolean {
+        if (text.isBlank() || closed.get()) return true
+        val localTts = tts ?: return false
+        val config = GenerationConfig(
+            speed = speed.coerceIn(0.5f, 2.0f),
+            silenceScale = 0.2f,
+        )
+        localTts.generateWithConfigAndCallback(text.trim(), config) { samples ->
             if (closed.get() || audioQueue.currentGeneration() != generation) 0
-            else if (audioQueue.enqueue(samples, tts!!.sampleRate(), generation)) 1
+            else if (audioQueue.enqueue(samples, localTts.sampleRate(), generation)) 1
             else 0
         }
-        return generation
+        return audioQueue.currentGeneration() == generation
     }
 
     fun stopGeneration() {
