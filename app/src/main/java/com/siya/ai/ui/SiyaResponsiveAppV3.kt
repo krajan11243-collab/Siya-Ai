@@ -1,9 +1,7 @@
 package com.siya.ai.ui
 
-import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -51,12 +49,7 @@ private val Muted = Color(0xFF8B98AD)
 private data class ChatMsg(val user: Boolean, val text: String, val thinking: Boolean = false)
 
 @Composable
-fun SiyaResponsiveAppV3(
-    microphoneGranted: Boolean,
-    onRequestPermissions: () -> Unit,
-    onStartVoice: () -> Unit,
-    onStopVoice: () -> Unit,
-) {
+fun SiyaResponsiveAppV3(microphoneGranted: Boolean, onRequestPermissions: () -> Unit, onStartVoice: () -> Unit, onStopVoice: () -> Unit) {
     var page by rememberSaveable { mutableStateOf("home") }
     val voice by VoiceSessionState.state.collectAsState()
     MaterialTheme(colorScheme = darkColorScheme(primary = Purple, background = Bg, surface = Panel)) {
@@ -106,7 +99,9 @@ private fun HomeScreen(granted: Boolean, voice: VoiceSessionState.State, onChat:
         }
         Text(if (!granted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak", Modifier.fillMaxWidth(), color = Muted, fontSize = 8.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onModels, Modifier.fillMaxWidth().height(40.dp), border = BorderStroke(1.dp, Cyan.copy(.5f)), shape = RoundedCornerShape(13.dp)) { Icon(Icons.Default.Memory, null, tint = Cyan, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(7.dp)); Text("Offline Models", color = Color.White, fontSize = 11.sp) }
+        OutlinedButton(onClick = onModels, modifier = Modifier.fillMaxWidth().height(40.dp), border = BorderStroke(1.dp, Cyan.copy(.5f)), shape = RoundedCornerShape(13.dp)) {
+            Icon(Icons.Default.Memory, null, tint = Cyan, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(7.dp)); Text("Offline Models", color = Color.White, fontSize = 11.sp)
+        }
         Spacer(Modifier.height(6.dp))
         Text("—   A L W A Y S   W I T H   Y O U   —", Modifier.fillMaxWidth(), color = Blue, fontSize = 6.sp, letterSpacing = 1.7.sp, textAlign = TextAlign.Center)
     }
@@ -120,14 +115,17 @@ private fun HomeScreen(granted: Boolean, voice: VoiceSessionState.State, onChat:
     Canvas(Modifier.fillMaxSize().padding(18.dp)) {
         val c = center
         val r = size.minDimension * .27f
-        drawCircle(Cyan.copy(.10f), r * 1.45f, c)
+        val orbit = androidx.compose.ui.geometry.Rect(c.x-r*1.25f,c.y-r*1.25f,c.x+r*1.25f,c.y+r*1.25f)
+        val oval = androidx.compose.ui.geometry.Rect(c.x-r*1.35f,c.y-r*.28f,c.x+r*1.35f,c.y+r*.28f)
+        val base = androidx.compose.ui.geometry.Rect(c.x-r*1.6f,c.y+r*1.25f,c.x+r*1.6f,c.y+r*1.55f)
+        drawCircle(Cyan.copy(.10f), r*1.45f, c)
         drawCircle(Cyan.copy(.9f), r, c, style = Stroke(4f))
-        drawCircle(Purple.copy(.7f), r * .68f, c, style = Stroke(2f))
-        drawOval(Blue.copy(.7f), androidx.compose.ui.geometry.Rect(c.x - r * 1.35f, c.y - r * .28f, c.x + r * 1.35f, c.y + r * .28f), style = Stroke(2f))
-        drawArc(Purple, -150f, 95f, false, androidx.compose.ui.geometry.Rect(c.x-r*1.25f,c.y-r*1.25f,c.x+r*1.25f,c.y+r*1.25f), style = Stroke(4f, cap = StrokeCap.Round))
-        drawArc(Cyan, 25f, 105f, false, androidx.compose.ui.geometry.Rect(c.x-r*1.25f,c.y-r*1.25f,c.x+r*1.25f,c.y+r*1.25f), style = Stroke(4f, cap = StrokeCap.Round))
+        drawCircle(Purple.copy(.7f), r*.68f, c, style = Stroke(2f))
+        drawOval(Blue.copy(.7f), topLeft = oval.topLeft, size = oval.size, style = Stroke(2f))
+        drawArc(Purple, -150f, 95f, false, topLeft = orbit.topLeft, size = orbit.size, style = Stroke(4f, cap = StrokeCap.Round))
+        drawArc(Cyan, 25f, 105f, false, topLeft = orbit.topLeft, size = orbit.size, style = Stroke(4f, cap = StrokeCap.Round))
         drawCircle(if (active) Cyan else Blue, 6f, c)
-        drawOval(Purple.copy(.7f), androidx.compose.ui.geometry.Rect(c.x-r*1.6f,c.y+r*1.25f,c.x+r*1.6f,c.y+r*1.55f), style = Stroke(2f))
+        drawOval(Purple.copy(.7f), topLeft = base.topLeft, size = base.size, style = Stroke(2f))
     }
 }
 
@@ -155,30 +153,17 @@ private fun HomeScreen(granted: Boolean, voice: VoiceSessionState.State, onChat:
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 12.dp, vertical = 5.dp)) {
         Row(Modifier.fillMaxWidth().height(58.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
-            Column(Modifier.weight(1f)) {
-                Text("AI Model Hub", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Real available offline models • no demo cards", color = Muted, fontSize = 9.sp)
-            }
+            Column(Modifier.weight(1f)) { Text("AI Model Hub", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold); Text("Real available offline models • no demo cards", color = Muted, fontSize = 9.sp) }
             Surface(Modifier.size(40.dp), RoundedCornerShape(13.dp), color = Panel, border = BorderStroke(1.dp, Cyan.copy(.55f))) { Icon(Icons.Default.Memory, null, tint = Cyan, modifier = Modifier.padding(9.dp)) }
         }
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(top = 5.dp, bottom = 12.dp)) {
             item { Text("LOCAL LLM", color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp) }
-            item {
-                QwenCard(
-                    installed = installed,
-                    downloading = downloading,
-                    done = done,
-                    total = total,
-                    onDownload = { downloading = true; ModelDownloadService.startQwen(context) },
-                    onCancel = { ModelDownloadService.cancelQwen(context); downloading = false },
-                    onDelete = { if (llm.delete()) { installed = false; message = "Qwen model deleted" } },
-                )
-            }
+            item { QwenCard(installed, downloading, done, total, { downloading = true; ModelDownloadService.startQwen(context) }, { ModelDownloadService.cancelQwen(context); downloading = false }, { if (llm.delete()) { installed = false; message = "Qwen model deleted" } }) }
             item { Text("VOICE MODELS", color = Purple, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 7.dp)) }
             item { SpeechCard("Silero VAD", "~2 MB", "Speech detection", vad.isInstalled(), speechBusy == "vad") { speechBusy = "vad"; scope.launch { runCatching { VoiceModelInstaller(vad, stt).downloadVad() }.onFailure { message = it.message }.onSuccess { message = "Silero VAD ready" }; speechBusy = "" } } }
             item { SpeechCard("Hindi STT • Sherpa-ONNX", "~80 MB", "Hindi + Hinglish speech-to-text", stt.isInstalled(), speechBusy == "stt") { speechBusy = "stt"; scope.launch { runCatching { VoiceModelInstaller(vad, stt).downloadHindiStt() }.onFailure { message = it.message }.onSuccess { message = "Hindi STT ready" }; speechBusy = "" } } }
             item { TtsStatusCard() }
-            message?.let { item { Text(it, color = if (it.contains("ready", true)) Green else Red, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 8.dp)) } }
+            message?.let { msg -> item { Text(msg, color = if (msg.contains("ready", true)) Green else Red, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 8.dp)) } }
         }
     }
 }
@@ -205,14 +190,14 @@ private fun HomeScreen(granted: Boolean, voice: VoiceSessionState.State, onChat:
                     Column(Modifier.weight(1f)) {
                         val pct = if (total > 0) (done * 100 / total).toInt() else 0
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Downloading…", color = Cyan, fontSize = 9.sp); Text("$pct%", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                        LinearProgressIndicator({ if (total > 0) done.toFloat() / total else 0f }, Modifier.fillMaxWidth().height(5.dp), color = Cyan, trackColor = Color.White.copy(.08f))
+                        LinearProgressIndicator(progress = { if (total > 0) done.toFloat() / total else 0f }, modifier = Modifier.fillMaxWidth().height(5.dp), color = Cyan, trackColor = Color.White.copy(.08f))
                         Text(if (total > 0) "${done / 1_048_576} / ${total / 1_048_576} MB" else "Preparing download…", color = Muted, fontSize = 8.sp, modifier = Modifier.padding(top = 3.dp))
                     }
                     Spacer(Modifier.width(7.dp)); IconButton(onClick = onCancel, modifier = Modifier.size(42.dp)) { Icon(Icons.Default.StopCircle, "Stop download", tint = Red) }
                 }
                 else -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Verified GGUF • SHA-256", color = Muted, fontSize = 8.sp, modifier = Modifier.weight(1f))
-                    Button(onClick = onDownload, Modifier.height(40.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue), contentPadding = PaddingValues(horizontal = 14.dp)) { Icon(Icons.Default.Download, null, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(5.dp)); Text("Download", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                    Button(onClick = onDownload, modifier = Modifier.height(40.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue), contentPadding = PaddingValues(horizontal = 14.dp)) { Icon(Icons.Default.Download, null, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(5.dp)); Text("Download", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -223,8 +208,9 @@ private fun HomeScreen(granted: Boolean, voice: VoiceSessionState.State, onChat:
     Canvas(modifier) {
         val r = size.minDimension * .31f
         val c = center
-        drawArc(Cyan, 20f, 135f, false, androidx.compose.ui.geometry.Rect(c.x-r,c.y-r,c.x+r,c.y+r), style = Stroke(4f, cap = StrokeCap.Round))
-        drawArc(Purple, 205f, 135f, false, androidx.compose.ui.geometry.Rect(c.x-r,c.y-r,c.x+r,c.y+r), style = Stroke(4f, cap = StrokeCap.Round))
+        val box = androidx.compose.ui.geometry.Rect(c.x-r,c.y-r,c.x+r,c.y+r)
+        drawArc(Cyan, 20f, 135f, false, topLeft = box.topLeft, size = box.size, style = Stroke(4f, cap = StrokeCap.Round))
+        drawArc(Purple, 205f, 135f, false, topLeft = box.topLeft, size = box.size, style = Stroke(4f, cap = StrokeCap.Round))
         drawLine(Cyan, androidx.compose.ui.geometry.Offset(c.x-r,c.y), androidx.compose.ui.geometry.Offset(c.x+r,c.y), strokeWidth = 3f, cap = StrokeCap.Round)
         drawCircle(Color.White, 3f, c)
     }
@@ -236,14 +222,14 @@ private fun HomeScreen(granted: Boolean, voice: VoiceSessionState.State, onChat:
             Surface(Modifier.size(43.dp), RoundedCornerShape(12.dp), color = Cyan.copy(.08f), border = BorderStroke(1.dp, Cyan.copy(.55f))) { Icon(Icons.Default.RecordVoiceOver, null, tint = Cyan, modifier = Modifier.padding(10.dp)) }
             Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold); Text(desc, color = Muted, fontSize = 9.sp); Text(size + "  •  On-device", color = Cyan.copy(.75f), fontSize = 8.sp) }
             if (installed) Text("READY", color = Green, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-            else Button(onClick = onDownload, enabled = !busy, Modifier.height(34.dp), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 10.dp)) { if (busy) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp) else Text("Download", fontSize = 9.sp) }
+            else Button(onClick = onDownload, enabled = !busy, modifier = Modifier.height(34.dp), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 10.dp)) { if (busy) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp) else Text("Download", fontSize = 9.sp) }
         }
     }
 }
 
 @Composable private fun TtsStatusCard() {
     Surface(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), color = Panel, border = BorderStroke(1.dp, Purple.copy(.3f))) {
-        Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.RecordVoiceOver, null, tint = Purple, modifier = Modifier.size(25.dp)); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("Part 6 • Local TTS", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold); Text("Adapter ready; Android local TTS now speaks Siya replies. Kokoro backend remains swappable.", color = Muted, fontSize = 8.sp) }; Text("READY", color = Green, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+        Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.RecordVoiceOver, null, tint = Purple, modifier = Modifier.size(25.dp)); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("Part 6 • Local TTS", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold); Text("Device-local TTS adapter with sentence chunking and cancellation. Kokoro backend remains swappable.", color = Muted, fontSize = 8.sp) }; Text("READY", color = Green, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
