@@ -6,13 +6,19 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Finalize Model Hub UI"]
+    types: [completed]
 
 jobs:
   test:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref }}
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
