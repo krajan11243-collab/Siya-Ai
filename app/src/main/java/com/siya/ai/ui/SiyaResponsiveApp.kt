@@ -490,7 +490,7 @@ private fun NeonAvatar(){
         drawCircle(Purple.copy(.75f),size.minDimension*.34f,c,style=Stroke(1.2f))
         drawCircle(Cyan.copy(.75f),size.minDimension*.10f,Offset(c.x,c.y-size.minDimension*.06f))
         drawArc(Cyan.copy(.65f),200f,140f,false,Offset(c.x-size.minDimension*.18f,c.y-size.minDimension*.03f),androidx.compose.ui.geometry.Size(size.minDimension*.36f,size.minDimension*.30f),style=Stroke(1.7f))
-        drawLine(Cyan.copy(.45f),Offset(c.x-size.minDimension*.20f,c.y+size.minDimension*.20f),Offset(c.x+size.minDimension*.20f,c.y+size.minDimension*.20f),1.4f)
+        drawLine(color=Cyan.copy(.45f),start=Offset(c.x-size.minDimension*.20f,c.y+size.minDimension*.20f),end=Offset(c.x+size.minDimension*.20f,c.y+size.minDimension*.20f),strokeWidth=1.4f)
     }
 }
 
