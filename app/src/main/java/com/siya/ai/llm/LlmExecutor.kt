@@ -76,7 +76,7 @@ class LlmExecutor(
                     loaded.stream(prompt, onToken = onToken)
                 }
             } catch (cancelled: CancellationException) {
-                return@launch
+                throw cancelled
             } catch (error: Throwable) {
                 Result.failure<LlmResult>(error)
             }
