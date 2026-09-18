@@ -171,7 +171,7 @@ private fun PixelHome(
         }
         Text(text="Hindi  •  Hinglish  •  English", modifier=Modifier.fillMaxWidth().padding(top=7.dp), color=Muted, fontSize=12.sp, textAlign=TextAlign.Center)
         Spacer(Modifier.height(10.dp))
-        NeonMicButton(active = voice.active, onClick = onVoice)
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { NeonMicButton(active = voice.active, onClick = onVoice) }
         Text(text=if (!microphoneGranted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak", modifier=Modifier.fillMaxWidth().padding(top=5.dp), color=Muted, fontSize=10.sp, textAlign=TextAlign.Center)
         Text(text="—   A L W A Y S   W I T H   Y O U   —", modifier=Modifier.fillMaxWidth().padding(top=8.dp), color=Blue, fontSize=8.sp, letterSpacing=2.3.sp, textAlign=TextAlign.Center)
         }
@@ -330,10 +330,10 @@ private fun HomeHeaderButton(icon: androidx.compose.ui.graphics.vector.ImageVect
 private fun NeonMicButton(active: Boolean, onClick: () -> Unit) {
     val t = rememberInfiniteTransition(label = "mic")
     val pulse by t.animateFloat(1f, 1.10f, infiniteRepeatable(tween(if (active) 650 else 1300), RepeatMode.Reverse), label = "pulse")
-    Box(Modifier.size(116.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(154.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val c = Offset(size.width / 2f, size.height / 2f)
-            val r = size.minDimension * .39f * pulse
+            val r = size.minDimension * .34f * pulse
             drawCircle(Brush.radialGradient(listOf(Cyan.copy(.22f), Purple.copy(.10f), Color.Transparent), c, r * 2.2f), r * 2.2f, c)
             drawCircle(Panel2, r, c)
             drawCircle(Cyan.copy(.85f), r, c, style = Stroke(2.8f))
