@@ -24,6 +24,7 @@ class LocalTtsEngine(
     private var streamingGeneration: Long? = null
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
     @Volatile private var ready = false
+    @Volatile private var pendingSpeech: String? = null
 
     override fun onInit(status: Int) {
         ready = status == TextToSpeech.SUCCESS
@@ -35,6 +36,10 @@ class LocalTtsEngine(
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) tts?.setLanguage(Locale.US)
         }
         onReady(ready || neural.isInstalled())
+        if (ready) {
+            val pending = synchronized(this) { pendingSpeech.also { pendingSpeech = null } }
+            if (!pending.isNullOrBlank()) speak(pending)
+        }
     }
 
     fun isReady(): Boolean = ready || neural.isInstalled()
@@ -56,7 +61,10 @@ class LocalTtsEngine(
             }
             return
         }
-        if (!ready) return
+        if (!ready) {
+            pendingSpeech = text
+            return
+        }
         chunkText(text).forEachIndexed { index, chunk ->
             tts?.speak(chunk, if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "siya-${System.nanoTime()}-$index")
         }
@@ -109,6 +117,7 @@ class LocalTtsEngine(
         worker.shutdownNow()
         tts?.shutdown()
         tts = null
+        pendingSpeech = null
         ready = false
     }
 }
