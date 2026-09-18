@@ -317,14 +317,19 @@ class SiyaVoiceService : Service() {
 
     private fun onPcm(buffer: ShortArray, length: Int) {
         if (length <= 0) return
-        sttPipeline?.onAudio(buffer, length)
         val handler = vadHandler ?: return
         val copy = buffer.copyOf(length)
+        // Keep audio append + VAD event handling on the same serial worker.
+        // This prevents a race where SPEECH_END could finish the STT segment
+        // before the final PCM frame has been appended.
         handler.post {
-            val processor = vadProcessor ?: return@post
+            val pipeline = sttPipeline
+            val processor = vadProcessor
+            if (pipeline == null || processor == null) return@post
             runCatching {
+                pipeline.onAudio(copy, copy.size)
                 processor.accept(copy, copy.size) { result ->
-                    sttPipeline?.onVad(result)
+                    pipeline.onVad(result)
                     when (result.event?.type) {
                         VadEventType.SPEECH_START -> {
                             VoiceSessionState.interrupting()
