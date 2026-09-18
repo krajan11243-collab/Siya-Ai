@@ -28,6 +28,6 @@ object VoiceSessionState {
     fun interrupting() = _state.value.let { _state.value = it.copy(active = true, phase = Phase.INTERRUPTING, error = null) }
     fun ready(text: String) = _state.value.let { _state.value = it.copy(active = true, phase = Phase.READY, response = text, error = null) }
     fun transcript(text: String) = _state.value.let { _state.value = it.copy(active = true, phase = Phase.LISTENING, transcript = text, error = null) }
-    fun error(message: String) = _state.value.let { _state.value = it.copy(active = true, phase = Phase.ERROR, error = message) }
+    fun error(message: String) = _state.value.let { _state.value = it.copy(active = false, phase = Phase.ERROR, error = message) }
     fun stopped() { _state.value = State() }
 }
