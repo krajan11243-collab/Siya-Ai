@@ -57,31 +57,33 @@ class LlmExecutor(
         engine?.cancelGeneration()
         currentJob?.cancel()
         currentJob = scope.launch {
-            val result: Result<LlmResult> = try {
+            try {
                 currentCoroutineContext().ensureActive()
                 // If warm-up is still loading, wait for it rather than starting
                 // another native model load.
                 warmupJob?.join()
                 currentCoroutineContext().ensureActive()
 
-                val fast = LlmFastPath.answer(prompt)
-                if (fast != null) {
+                val result: LlmResult = LlmFastPath.answer(prompt)?.let { fast ->
                     onToken(fast)
-                    Result.success(LlmResult(text = fast, tokensPerSecond = Float.POSITIVE_INFINITY))
-                } else {
+                    LlmResult(text = fast, tokensPerSecond = Float.POSITIVE_INFINITY)
+                } ?: run {
                     val loaded = engine ?: engineFactory().also {
                         it.load()
                         engine = it
                     }
                     loaded.stream(prompt, onToken = onToken)
                 }
+
+                if (!closed.get() && myTurn == turnId.get() && currentCoroutineContext().isActive) {
+                    onResult(Result.success(result))
+                }
             } catch (cancelled: CancellationException) {
-                throw cancelled
+                // Expected on barge-in / a newer turn. Do not surface a fake error.
             } catch (error: Throwable) {
-                Result.failure<LlmResult>(error)
-            }
-            if (!closed.get() && myTurn == turnId.get() && currentCoroutineContext().isActive) {
-                onResult(result)
+                if (!closed.get() && myTurn == turnId.get() && currentCoroutineContext().isActive) {
+                    onResult(Result.failure(error))
+                }
             }
         }
     }
