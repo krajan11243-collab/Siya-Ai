@@ -33,7 +33,7 @@ class LocalLlmEngine(
             useMlock = false
             gpuLayers = 0
         }
-        modelStore.backupToShared()
+        // The installer already maintains the shared backup; never copy the 1+ GB GGUF during model load.
     }
 
     suspend fun complete(
