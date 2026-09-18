@@ -35,8 +35,14 @@ class LlmExecutor(
         warmupJob = scope.launch {
             runCatching {
                 currentCoroutineContext().ensureActive()
-                if (engine == null) engineFactory().also { it.load() }.let { loaded ->
-                    if (!closed.get()) engine = loaded else loaded.close()
+                if (engine == null) {
+                    val loaded: LocalLlmEngine = engineFactory()
+                    loaded.load()
+                    if (!closed.get()) {
+                        engine = loaded
+                    } else {
+                        loaded.close()
+                    }
                 }
             }
         }
