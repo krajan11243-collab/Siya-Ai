@@ -425,54 +425,160 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
     var attached by rememberSaveable{mutableStateOf<String?>(null)}
     var menu by remember{mutableStateOf(false)}
     var installed by remember{mutableStateOf(store.isInstalled())}
-    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->attached=uri?.lastPathSegment?.substringAfterLast('/') ?: uri?.toString()}
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        attached=uri?.lastPathSegment?.substringAfterLast('/') ?: uri?.toString()
+    }
     DisposableEffect(Unit){onDispose{engine.close()}}
     LaunchedEffect(voice.phase,voice.transcript,voice.response){
         if(voice.phase==VoiceSessionState.Phase.THINKING && voice.transcript.isNotBlank() && messages.none{it.first&&it.second==voice.transcript})messages+=true to voice.transcript
         if(voice.phase==VoiceSessionState.Phase.READY && voice.response.isNotBlank() && messages.none{!it.first&&it.second==voice.response})messages+=false to voice.response
     }
-    Box(Modifier.fillMaxSize()){
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal=12.dp,vertical=7.dp)){
-            Row(Modifier.fillMaxWidth().height(68.dp),verticalAlignment=Alignment.CenterVertically){
-                NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(imageVector=Icons.AutoMirrored.Filled.ArrowBack,contentDescription="Back",tint=White,modifier=Modifier.padding(11.dp))}
-                Spacer(Modifier.width(11.dp))
-                Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
-                    Row(verticalAlignment=Alignment.CenterVertically){Text(text="Siya",color=White,fontSize=28.sp,fontWeight=FontWeight.Bold);Text(text=" Ai",color=Cyan,fontSize=28.sp,fontWeight=FontWeight.Bold)}
-                    Text(text="Y O U R   A I   C O M P A N I O N",color=Muted,fontSize=7.sp,letterSpacing=2.2.sp)
+
+    Box(Modifier.fillMaxSize().background(Bg)){
+        ChatAmbientBackground()
+        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal=14.dp,vertical=6.dp)){
+            Row(Modifier.fillMaxWidth().height(76.dp),verticalAlignment=Alignment.CenterVertically){
+                NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack,"Back",tint=White,modifier=Modifier.padding(10.dp))
                 }
-                NeonSurface(Modifier.size(48.dp).clickable{menu=true},Purple,15.dp){Icon(imageVector=Icons.Default.Menu,contentDescription="Menu",tint=Purple,modifier=Modifier.padding(11.dp))}
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Text("Siya",color=White,fontSize=30.sp,fontWeight=FontWeight.ExtraBold)
+                        Text(" Ai",color=Cyan,fontSize=30.sp,fontWeight=FontWeight.ExtraBold)
+                    }
+                    Text("Y O U R   A I   C O M P A N I O N",color=Muted,fontSize=7.sp,letterSpacing=2.6.sp)
+                }
+                NeonSurface(Modifier.size(48.dp).clickable{menu=!menu},Purple,15.dp){
+                    Icon(Icons.Default.Menu,"Menu",tint=White,modifier=Modifier.padding(10.dp))
+                }
             }
             NeonDivider()
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(),contentPadding=PaddingValues(top=13.dp,bottom=13.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                if(messages.isEmpty())item{AssistantBubble("Hello! 👋\nमैं Siya Ai हूँ\nमैं आपकी कैसे मदद कर सकती हूँ?")}
-                items(messages){m->if(m.first)UserBubble(m.second)else AssistantBubble(m.second)}
+            LazyColumn(
+                Modifier.weight(1f).fillMaxWidth(),
+                contentPadding=PaddingValues(top=14.dp,bottom=12.dp),
+                verticalArrangement=Arrangement.spacedBy(12.dp)
+            ){
+                if(messages.isEmpty()) item {
+                    ChatAssistantBubble("Hello! 👋\nमैं Siya Ai हूँ\nमैं आपकी कैसे मदद कर सकती हूँ?","10:24 PM")
+                }
+                items(messages){m->
+                    if(m.first) ChatUserBubble(m.second,"10:25 PM")
+                    else ChatAssistantBubble(m.second,"10:25 PM")
+                }
             }
-            if(attached!=null){Surface(shape=RoundedCornerShape(10.dp),color=Panel2,border=BorderStroke(1.dp,Cyan.copy(.45f))){Text(text="📎 "+attached!!,modifier=Modifier.padding(7.dp),color=Cyan,fontSize=9.sp,maxLines=1)};Spacer(Modifier.height(5.dp))}
-            Row(Modifier.fillMaxWidth().padding(bottom=5.dp),verticalAlignment=Alignment.Bottom){
-                NeonSurface(Modifier.size(48.dp).clickable{picker.launch(arrayOf("*/*"))},Purple,15.dp){Icon(imageVector=Icons.Default.AttachFile,contentDescription="Attach",tint=White,modifier=Modifier.padding(12.dp))}
-                Spacer(Modifier.width(7.dp))
-                OutlinedTextField(value=input,onValueChange={input=it},modifier=Modifier.weight(1f),placeholder={Text("Type your message…",color=Muted)},shape=RoundedCornerShape(18.dp),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Text),colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=Purple,unfocusedBorderColor=Panel2,focusedTextColor=White,unfocusedTextColor=White,cursorColor=Cyan),maxLines=4)
-                Spacer(Modifier.width(5.dp))
-                NeonSurface(Modifier.size(48.dp),Blue,15.dp){Icon(imageVector=Icons.Default.Mic,contentDescription="Voice",tint=White,modifier=Modifier.padding(12.dp))}
-                Spacer(Modifier.width(5.dp))
-                NeonSurface(Modifier.size(53.dp).clickable(enabled=input.isNotBlank()&&!busy){
-                    val prompt=input.trim();input="";messages+=true to prompt;busy=true
-                    scope.launch{
-                        try{check(store.isInstalled()){"Qwen model is not installed"};val result=engine.complete(prompt);messages+=false to result.text;installed=true}
-                        catch(e:Exception){messages+=false to "Local AI error: "+(e.message ?: "model unavailable")}
-                        finally{busy=false}
+            attached?.let{
+                NeonSurface(Modifier.fillMaxWidth().padding(bottom=6.dp),Cyan,11.dp){
+                    Text("📎 $it",color=Cyan,fontSize=9.sp,maxLines=1,modifier=Modifier.padding(horizontal=10.dp,vertical=7.dp))
+                }
+            }
+            NeonSurface(Modifier.fillMaxWidth(),Purple,20.dp){
+                Row(Modifier.padding(6.dp),verticalAlignment=Alignment.CenterVertically){
+                    NeonSurface(Modifier.size(50.dp).clickable{picker.launch(arrayOf("*/*"))},Purple,15.dp){
+                        Icon(Icons.Default.AttachFile,"Attach",tint=White,modifier=Modifier.padding(12.dp))
                     }
-                },Purple,17.dp){Icon(imageVector=Icons.Default.Send,contentDescription="Send",tint=White,modifier=Modifier.padding(14.dp))}
+                    Spacer(Modifier.width(7.dp))
+                    BasicChatField(input,onValueChange={input=it})
+                    Spacer(Modifier.width(5.dp))
+                    NeonSurface(Modifier.size(46.dp),Blue,50.dp){
+                        Icon(Icons.Default.Mic,"Voice",tint=White,modifier=Modifier.padding(12.dp))
+                    }
+                    Spacer(Modifier.width(5.dp))
+                    NeonSurface(
+                        Modifier.size(54.dp).clickable(enabled=input.isNotBlank()&&!busy){
+                            val prompt=input.trim();input="";messages+=true to prompt;busy=true
+                            scope.launch{
+                                try{
+                                    check(store.isInstalled()){"Qwen model is not installed"}
+                                    val result=engine.complete(prompt)
+                                    messages+=false to result.text
+                                    installed=true
+                                }catch(e:Exception){
+                                    messages+=false to "Local AI error: "+(e.message?:"model unavailable")
+                                }finally{busy=false}
+                            }
+                        },Purple,50.dp
+                    ){Icon(Icons.Default.Send,"Send",tint=White,modifier=Modifier.padding(14.dp))}
+                }
             }
         }
-        if(menu)Box(Modifier.fillMaxSize().background(Color.Black.copy(.42f)).clickable{menu=false}){
-            NeonSurface(Modifier.align(Alignment.TopEnd).padding(top=72.dp,end=13.dp).width(190.dp),Purple,18.dp){
-                Column(Modifier.padding(8.dp)){
+        if(menu){
+            NeonSurface(
+                Modifier.align(Alignment.TopEnd).padding(top=86.dp,end=14.dp).width(190.dp),
+                Purple,18.dp
+            ){
+                Column(Modifier.padding(7.dp)){
                     MenuItem("AI Models",Icons.Default.Memory){menu=false;onModels()}
                     MenuItem("Offline: "+if(installed)"READY" else "MODEL MISSING",Icons.Default.CloudOff){menu=false}
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BasicChatField(value:String,onValueChange:(String)->Unit){
+    androidx.compose.foundation.text.BasicTextField(
+        value=value,onValueChange=onValueChange,
+        modifier=Modifier.weight(1f).padding(horizontal=4.dp,vertical=7.dp),
+        textStyle=androidx.compose.ui.text.TextStyle(color=White,fontSize=15.sp),
+        maxLines=4,
+        decorationBox={inner->
+            if(value.isEmpty())Text("Type your message…",color=Muted,fontSize=15.sp)
+            inner()
+        }
+    )
+}
+
+@Composable
+private fun ChatAssistantBubble(text:String,time:String){
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Top){
+        NeonAvatar()
+        Spacer(Modifier.width(8.dp))
+        NeonSurface(Modifier.widthIn(max=330.dp),Cyan,18.dp){
+            Column(Modifier.padding(horizontal=14.dp,vertical=10.dp)){
+                Row(verticalAlignment=Alignment.CenterVertically){
+                    Text("Siya Ai",color=Cyan,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                    Spacer(Modifier.width(9.dp))
+                    Text(time,color=Muted,fontSize=9.sp)
+                }
+                Text(text,color=White,fontSize=15.sp,modifier=Modifier.padding(top=6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatUserBubble(text:String,time:String){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+        NeonSurface(Modifier.widthIn(max=355.dp),Purple,18.dp){
+            Column(Modifier.padding(horizontal=14.dp,vertical=9.dp)){
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+                    Text(time,color=Muted,fontSize=9.sp)
+                    Spacer(Modifier.width(5.dp))
+                    Text("✓✓",color=Cyan,fontSize=9.sp)
+                }
+                Text(text,color=White,fontSize=15.sp,modifier=Modifier.padding(top=4.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatAmbientBackground(){
+    Canvas(Modifier.fillMaxSize()){
+        val w=size.width
+        val h=size.height
+        drawCircle(Purple.copy(.10f),w*.42f,Offset(w*.52f,-h*.01f))
+        drawCircle(Cyan.copy(.055f),w*.50f,Offset(w*.02f,h*.58f))
+        drawCircle(Blue.copy(.045f),w*.52f,Offset(w*1.02f,h*.70f))
+        val waveY=h*.83f
+        val path=androidx.compose.ui.graphics.Path().apply{
+            moveTo(0f,waveY)
+            cubicTo(w*.18f,waveY-h*.035f,w*.30f,waveY+h*.035f,w*.48f,waveY)
+            cubicTo(w*.66f,waveY-h*.035f,w*.80f,waveY+h*.035f,w,waveY-h*.008f)
+        }
+        drawPath(path,brush=Brush.horizontalGradient(listOf(Color.Transparent,Cyan.copy(.32f),Purple.copy(.32f),Color.Transparent)),style=Stroke(2.dp.toPx()))
     }
 }
 
