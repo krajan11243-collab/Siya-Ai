@@ -132,218 +132,128 @@ private fun PixelHome(
     onRequestPermissions: () -> Unit,
     onVoice: () -> Unit
 ) {
-    Box(Modifier.fillMaxSize().background(Bg)){
-        HomeAmbientBackground()
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 18.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth().height(70.dp), verticalAlignment = Alignment.CenterVertically) {
-            HomeHeaderButton(Icons.Default.ChatBubble, "CHAT", Cyan, onChat)
-            Spacer(Modifier.weight(1f))
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Siya", color = White, fontSize = 35.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(" Ai", color = Cyan, fontSize = 35.sp, fontWeight = FontWeight.ExtraBold)
+    Box(Modifier.fillMaxSize().background(Color(0xFF00030C))) {
+        ReferenceHomeBackground()
+        Column(
+            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = 20.dp, vertical = 7.dp)
+        ) {
+            Row(Modifier.fillMaxWidth().height(91.dp), verticalAlignment = Alignment.Top) {
+                HomeHeaderButton(Icons.Default.ChatBubble, "CHAT", Cyan, onChat)
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 2.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Siya", color = White, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(" Ai", color = Cyan, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Text("Y O U R   A I   C O M P A N I O N", color = Muted, fontSize = 8.sp, letterSpacing = 2.8.sp)
+                    Box(Modifier.padding(top = 8.dp).width(185.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Cyan, Color.Transparent))))
                 }
-                Text("Y O U R   A I   C O M P A N I O N", color = Muted, fontSize = 8.sp, letterSpacing = 2.7.sp)
+                Spacer(Modifier.weight(1f))
+                HomeHeaderButton(Icons.Default.Settings, "SETTINGS", Purple, onSettings)
             }
-            Spacer(Modifier.weight(1f))
-            HomeHeaderButton(Icons.Default.Settings, "SETTINGS", Purple, onSettings)
-        }
-        Text("L I S T E N S     •     U N D E R S T A N D S     •     C O N T R O L S",
-            Modifier.fillMaxWidth().padding(top = 7.dp), color = Cyan, fontSize = 9.sp, letterSpacing = 1.6.sp, textAlign = TextAlign.Center)
-        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-            DetailedHologram(active = voice.active, modifier = Modifier.fillMaxSize())
-        }
-        val status = when (voice.phase) {
-            VoiceSessionState.Phase.LISTENING -> "Listening…"
-            VoiceSessionState.Phase.TRANSCRIBING -> "Understanding…"
-            VoiceSessionState.Phase.THINKING -> "Siya is thinking…"
-            VoiceSessionState.Phase.SPEAKING -> "Siya is speaking…"
-            VoiceSessionState.Phase.INTERRUPTING -> "Listening…"
-            VoiceSessionState.Phase.READY -> "Ready"
-            VoiceSessionState.Phase.ERROR -> "Something needs attention"
-            VoiceSessionState.Phase.IDLE -> "Tap to Speak"
-        }
-        Text(text=status, modifier=Modifier.fillMaxWidth(), color=White, fontSize=21.sp, fontWeight=FontWeight.Bold, textAlign=TextAlign.Center)
-        if (voice.response.isNotBlank() && voice.phase == VoiceSessionState.Phase.READY) {
-            NeonSurface(Modifier.fillMaxWidth().padding(top = 8.dp), Cyan, 15.dp) {
-                Text(text=voice.response, modifier=Modifier.padding(12.dp), color=White, fontSize=12.sp, maxLines=2)
+            Text("L I S T E N S     •     U N D E R S T A N D S     •     C O N T R O L S",
+                Modifier.fillMaxWidth().padding(top = 2.dp), color = Cyan, fontSize = 9.sp, letterSpacing = 1.55.sp, textAlign = TextAlign.Center)
+            Box(Modifier.fillMaxWidth().weight(1f).padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                ReferenceHologram(active = voice.active, modifier = Modifier.fillMaxSize())
+                Column(Modifier.fillMaxSize().padding(top = 32.dp, bottom = 15.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        ReferenceSideText(listOf("FAST", "SMART", "SECURE", "ALWAYS WITH YOU"), Alignment.Start)
+                        ReferenceSideText(listOf("MORE", "THAN AI", "A REAL", "COMPANION"), Alignment.End)
+                    }
+                    ReferenceSideText(listOf("SIMPLE", "NATURAL", "POWERFUL", "IN YOUR LANGUAGE"), Alignment.End, Modifier.align(Alignment.End).padding(end = 2.dp, bottom = 3.dp))
+                }
             }
-        }
-        Text(text="Hindi  •  Hinglish  •  English", modifier=Modifier.fillMaxWidth().padding(top=7.dp), color=Muted, fontSize=12.sp, textAlign=TextAlign.Center)
-        Spacer(Modifier.height(10.dp))
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { NeonMicButton(active = voice.active, onClick = onVoice) }
-        Text(text=if (!microphoneGranted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak", modifier=Modifier.fillMaxWidth().padding(top=5.dp), color=Muted, fontSize=10.sp, textAlign=TextAlign.Center)
-        Text(text="—   A L W A Y S   W I T H   Y O U   —", modifier=Modifier.fillMaxWidth().padding(top=8.dp), color=Blue, fontSize=8.sp, letterSpacing=2.3.sp, textAlign=TextAlign.Center)
+            Text("Tap to speak", Modifier.fillMaxWidth().padding(top = 1.dp), color = Muted, fontSize = 17.sp, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(1.dp))
+            ReferenceMicButton(active = voice.active, enabled = microphoneGranted, onClick = onVoice)
+            Text(if (!microphoneGranted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak",
+                Modifier.fillMaxWidth().padding(top = 0.dp), color = Muted, fontSize = 9.sp, textAlign = TextAlign.Center)
+            Text("—   A L W A Y S   W I T H   Y O U   —", Modifier.fillMaxWidth().padding(top = 8.dp), color = Blue, fontSize = 8.sp, letterSpacing = 2.35.sp, textAlign = TextAlign.Center)
         }
     }
 }
+
 @Composable
-private fun DetailedHologram(active: Boolean, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "hologram")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(if (active) 1800 else 5200, easing = FastOutSlowInEasing), RepeatMode.Restart),
-        label = "phase"
-    )
-    val breathe by transition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(tween(if (active) 850 else 1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "breathe"
-    )
+private fun ReferenceSideText(lines: List<String>, alignment: Alignment.Horizontal, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = alignment) {
+        Box(Modifier.width(37.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Cyan.copy(.65f), Color.Transparent))))
+        lines.forEach { Text(it, color = Muted.copy(.82f), fontSize = 7.sp, letterSpacing = 1.55.sp) }
+    }
+}
+
+@Composable
+private fun ReferenceHologram(active: Boolean, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "reference-hologram")
+    val phase by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(if (active) 1500 else 4800, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "phase")
+    val breathe by transition.animateFloat(.96f, 1.045f, infiniteRepeatable(tween(if (active) 850 else 1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
     Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val cx = w / 2f
-        val cy = h * 0.47f
-        val base = minOf(w, h) * 0.30f * breathe
-        val glow = Brush.radialGradient(
-            listOf(Cyan.copy(if (active) .24f else .16f), Purple.copy(.12f), Color.Transparent),
-            Offset(cx, cy), base * 2.25f
-        )
-        drawCircle(glow, base * 2.25f, Offset(cx, cy))
-
-        // Precision grid / crosshair.
-        drawLine(Cyan.copy(.16f), Offset(cx, cy - base * 2.05f), Offset(cx, cy + base * 2.05f), 1.dp.toPx())
-        drawLine(Cyan.copy(.14f), Offset(cx - base * 2.05f, cy), Offset(cx + base * 2.05f, cy), 1.dp.toPx())
-
-        // Layered holographic core.
-        drawCircle(
-            Brush.radialGradient(listOf(White.copy(.34f), Cyan.copy(.18f), Purple.copy(.10f), Color.Transparent), Offset(cx, cy), base),
-            base, Offset(cx, cy)
-        )
-        listOf(.52f, .74f, .98f, 1.22f, 1.48f).forEachIndexed { index, scale ->
-            drawCircle(
-                if (index % 2 == 0) Cyan.copy(.22f) else Purple.copy(.20f),
-                base * scale,
-                Offset(cx, cy),
-                style = Stroke((if (index < 2) 1.8f else 1f).dp.toPx())
-            )
-        }
-
-        // Orbit rings at different tilts.
-        val orbitColors = listOf(Cyan.copy(.78f), Purple.copy(.70f), Blue.copy(.48f), Cyan.copy(.34f), Purple.copy(.38f))
-        val angles = listOf(-18f, 28f, 66f, -55f, 10f)
-        angles.forEachIndexed { index, angle ->
-            val ovalW = base * (2.05f + index * .16f)
-            val ovalH = base * (.55f + index * .08f)
-            drawOval(
-                brush = Brush.horizontalGradient(listOf(Color.Transparent, orbitColors[index], Color.Transparent)),
-                topLeft = Offset(cx - ovalW / 2f, cy - ovalH / 2f),
-                size = androidx.compose.ui.geometry.Size(ovalW, ovalH),
-                style = Stroke((if (index < 2) 2.1f else 1.1f).dp.toPx())
-            )
-        }
-
-        // Rotating bright arc segments.
+        val w = size.width; val h = size.height; val cx = w * .50f; val cy = h * .46f
+        val r = minOf(w, h) * .235f * breathe; val stroke = 1.dp.toPx()
+        drawCircle(Brush.radialGradient(listOf(Cyan.copy(if (active) .25f else .18f), Blue.copy(.10f), Purple.copy(.09f), Color.Transparent), Offset(cx, cy), r * 2.35f), r * 2.35f, Offset(cx, cy))
+        drawLine(Cyan.copy(.18f), Offset(cx, cy-r*2.25f), Offset(cx, cy+r*2.25f), stroke)
+        drawLine(Cyan.copy(.16f), Offset(cx-r*2.25f, cy), Offset(cx+r*2.25f, cy), stroke)
+        listOf(1.28f, 1.55f, 1.82f).forEachIndexed { i, s -> drawCircle(if (i == 1) Purple.copy(.24f) else Cyan.copy(.18f), r*s, Offset(cx,cy), style=Stroke((if(i==1) 1.5f else 1f).dp.toPx())) }
         val sweep = phase * 360f
-        drawArc(Cyan.copy(.95f), sweep, 92f, false,
-            Offset(cx - base * 1.48f, cy - base * 1.48f),
-            androidx.compose.ui.geometry.Size(base * 2.96f, base * 2.96f),
-            style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
-        drawArc(Purple.copy(.92f), sweep + 180f, 78f, false,
-            Offset(cx - base * 1.62f, cy - base * 1.62f),
-            androidx.compose.ui.geometry.Size(base * 3.24f, base * 3.24f),
-            style = Stroke(3.2.dp.toPx(), cap = StrokeCap.Round))
-        drawArc(Blue.copy(.75f), sweep + 285f, 42f, false,
-            Offset(cx - base * 1.78f, cy - base * 1.78f),
-            androidx.compose.ui.geometry.Size(base * 3.56f, base * 3.56f),
-            style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-
-        // Orbit particles.
-        repeat(18) { index ->
-            val a = (index / 18f) * 6.28318f + phase * 6.28318f * (if (index % 2 == 0) 1f else -0.7f)
-            val rx = base * (1.12f + (index % 4) * .16f)
-            val ry = base * (.62f + (index % 3) * .13f)
-            val px = cx + kotlin.math.cos(a) * rx
-            val py = cy + kotlin.math.sin(a) * ry
-            val r = if (index % 5 == 0) 2.5f else 1.3f
-            drawCircle(if (index % 3 == 0) Purple.copy(.88f) else Cyan.copy(.82f), r.dp.toPx(), Offset(px, py))
+        drawArc(Cyan.copy(.92f), sweep, 112f, false, Offset(cx-r*1.82f,cy-r*1.82f), androidx.compose.ui.geometry.Size(r*3.64f,r*3.64f), style=Stroke(3.6.dp.toPx(),cap=StrokeCap.Round))
+        drawArc(Purple.copy(.88f), sweep+150f, 96f, false, Offset(cx-r*1.96f,cy-r*1.96f), androidx.compose.ui.geometry.Size(r*3.92f,r*3.92f), style=Stroke(3.dp.toPx(),cap=StrokeCap.Round))
+        drawArc(Blue.copy(.62f), sweep+285f, 54f, false, Offset(cx-r*2.08f,cy-r*2.08f), androidx.compose.ui.geometry.Size(r*4.16f,r*4.16f), style=Stroke(1.6.dp.toPx(),cap=StrokeCap.Round))
+        drawCircle(Brush.radialGradient(listOf(White.copy(.20f), Cyan.copy(.17f), Blue.copy(.11f), Purple.copy(.10f), Color.Transparent), Offset(cx-r*.10f,cy-r*.13f), r*1.06f), r*1.06f, Offset(cx,cy))
+        drawCircle(Cyan.copy(.28f),r*1.00f,Offset(cx,cy),style=Stroke(1.2.dp.toPx()))
+        drawCircle(White.copy(.15f),r*.78f,Offset(cx,cy),style=Stroke(1.dp.toPx()))
+        listOf(.56f,.46f,.38f,.32f).forEachIndexed { i, oh ->
+            val ow = listOf(2.05f,1.92f,1.70f,1.50f)[i]
+            drawOval(Brush.horizontalGradient(listOf(Color.Transparent, if(i%2==0) Cyan.copy(.76f) else Purple.copy(.70f), Color.Transparent)), Offset(cx-r*ow/2f,cy-r*oh/2f), androidx.compose.ui.geometry.Size(r*ow,r*oh), style=Stroke((if(i<2) 2f else 1f).dp.toPx()))
         }
-
-        // Fine digital tick marks around the main sphere.
-        val ticks = 48
-        repeat(ticks) { index ->
-            val a = index.toFloat() / ticks * 6.28318f
-            val inner = base * 1.63f
-            val outer = inner + if (index % 4 == 0) base * .12f else base * .055f
-            val p1 = Offset(cx + kotlin.math.cos(a) * inner, cy + kotlin.math.sin(a) * inner)
-            val p2 = Offset(cx + kotlin.math.cos(a) * outer, cy + kotlin.math.sin(a) * outer)
-            drawLine(if (index % 4 == 0) Cyan.copy(.60f) else Muted.copy(.30f), p1, p2, 1.dp.toPx())
+        repeat(9) { i ->
+            val a=(i/9f)*6.28318f+phase*6.28318f*(if(i%2==0) 1f else -.65f)
+            val rx=r*(.78f+(i%3)*.23f); val ry=r*(.33f+(i%2)*.15f)
+            drawCircle(if(i%3==0) Purple.copy(.95f) else Cyan.copy(.9f), if(i%4==0) 3.dp.toPx() else 1.5.dp.toPx(), Offset(cx+kotlin.math.cos(a)*rx,cy+kotlin.math.sin(a)*ry))
         }
-
-        // Projection platform.
-        val platformY = cy + base * 1.86f
-        drawOval(
-            Brush.horizontalGradient(listOf(Color.Transparent, Purple.copy(.55f), Cyan.copy(.72f), Purple.copy(.55f), Color.Transparent)),
-            Offset(cx - base * 1.62f, platformY - base * .10f),
-            androidx.compose.ui.geometry.Size(base * 3.24f, base * .20f),
-            style = Stroke(1.6.dp.toPx())
-        )
-        drawOval(
-            Brush.horizontalGradient(listOf(Color.Transparent, Cyan.copy(.45f), Purple.copy(.42f), Color.Transparent)),
-            Offset(cx - base * 1.35f, platformY - base * .035f),
-            androidx.compose.ui.geometry.Size(base * 2.70f, base * .07f),
-            style = Stroke(1.dp.toPx())
-        )
-
-        // Vertical scan beam.
-        val beamX = cx + (phase - .5f) * base * .95f
-        drawLine(Cyan.copy(.20f), Offset(beamX, cy - base * 1.95f), Offset(beamX, cy + base * 1.95f), 1.dp.toPx())
-
-        // Central energy point.
-        drawCircle(White.copy(.96f), base * .055f, Offset(cx, cy))
-        drawCircle(Cyan.copy(.88f), base * .105f, Offset(cx, cy), style = Stroke(2.dp.toPx()))
-        drawCircle(Purple.copy(.45f), base * .17f, Offset(cx, cy), style = Stroke(1.dp.toPx()))
+        repeat(48) { i ->
+            val a=i/48f*6.28318f; val inner=r*1.88f; val outer=inner+if(i%4==0) r*.10f else r*.045f
+            drawLine(if(i%4==0) Cyan.copy(.55f) else Muted.copy(.23f), Offset(cx+kotlin.math.cos(a)*inner,cy+kotlin.math.sin(a)*inner), Offset(cx+kotlin.math.cos(a)*outer,cy+kotlin.math.sin(a)*outer), stroke)
+        }
+        val beamX=cx+(phase-.5f)*r*1.15f
+        drawLine(Cyan.copy(.22f),Offset(beamX,cy-r*2.18f),Offset(beamX,cy+r*2.18f),stroke)
+        repeat(22) { i -> val a=i/22f*6.28318f+phase*6.28318f*.35f; val rr=r*(1.35f+(i%5)*.16f); drawCircle(if(i%4==0) Purple.copy(.9f) else Cyan.copy(.72f),if(i%7==0) 2.4.dp.toPx() else 1.dp.toPx(),Offset(cx+kotlin.math.cos(a)*rr,cy+kotlin.math.sin(a)*rr)) }
+        drawCircle(Cyan.copy(.18f),r*.22f,Offset(cx,cy)); drawCircle(White.copy(.98f),r*.075f,Offset(cx,cy)); drawCircle(Cyan.copy(.95f),r*.13f,Offset(cx,cy),style=Stroke(2.dp.toPx()))
+        val py=cy+r*1.92f
+        drawOval(Brush.horizontalGradient(listOf(Color.Transparent,Purple.copy(.48f),Cyan.copy(.72f),Purple.copy(.48f),Color.Transparent)),Offset(cx-r*1.70f,py-r*.08f),androidx.compose.ui.geometry.Size(r*3.40f,r*.16f),style=Stroke(1.5.dp.toPx()))
+        drawOval(Brush.horizontalGradient(listOf(Color.Transparent,Cyan.copy(.34f),Purple.copy(.30f),Color.Transparent)),Offset(cx-r*1.42f,py),androidx.compose.ui.geometry.Size(r*2.84f,r*.07f),style=Stroke(1.dp.toPx()))
     }
 }
 
 @Composable
-private fun HomeAmbientBackground(){
-    val transition=rememberInfiniteTransition(label="home-ambient")
-    val pulse by transition.animateFloat(0f,1f,infiniteRepeatable(tween(4200,easing=FastOutSlowInEasing),RepeatMode.Reverse),label="pulse")
-    Canvas(Modifier.fillMaxSize()){
+private fun ReferenceHomeBackground() {
+    val t=rememberInfiniteTransition(label="reference-bg")
+    val phase by t.animateFloat(0f,1f,infiniteRepeatable(tween(5000,easing=FastOutSlowInEasing),RepeatMode.Reverse),label="bg")
+    Canvas(Modifier.fillMaxSize()) {
         val w=size.width; val h=size.height
-        drawCircle(Purple.copy(.08f),w*.72f,Offset(w*.82f,h*.08f))
-        drawCircle(Cyan.copy(.05f),w*.55f,Offset(w*.08f,h*.72f))
-        val r=w*.44f
-        drawArc(Purple.copy(.25f+pulse*.08f),205f,130f,false,Offset(w/2-r,h*.30f),androidx.compose.ui.geometry.Size(r*2,r*2),style=Stroke(2.2.dp.toPx()))
-        drawArc(Cyan.copy(.22f+pulse*.08f),25f,130f,false,Offset(w/2-r,h*.30f),androidx.compose.ui.geometry.Size(r*2,r*2),style=Stroke(2.2.dp.toPx()))
-        val y=h*.91f
-        val path=androidx.compose.ui.graphics.Path().apply{moveTo(0f,y);cubicTo(w*.18f,y-h*.045f,w*.32f,y+h*.035f,w*.50f,y);cubicTo(w*.68f,y-h*.035f,w*.82f,y+h*.045f,w,y-h*.01f)}
-        drawPath(path,Brush.horizontalGradient(listOf(Color.Transparent,Cyan.copy(.35f),Purple.copy(.35f),Color.Transparent)),style=Stroke(2.5.dp.toPx()))
+        drawCircle(Purple.copy(.065f),w*.72f,Offset(w*.98f,h*.08f)); drawCircle(Blue.copy(.045f),w*.55f,Offset(w*.02f,h*.70f)); drawCircle(Cyan.copy(.025f),w*.70f,Offset(w*.54f,h*.46f))
+        val y=h*.90f
+        val path=androidx.compose.ui.graphics.Path().apply{moveTo(-20f,y);cubicTo(w*.12f,y-h*.045f,w*.28f,y+h*.045f,w*.43f,y);cubicTo(w*.60f,y-h*.050f,w*.75f,y+h*.045f,w*.94f,y-h*.018f);cubicTo(w*1.02f,y-h*.035f,w*1.04f,y-h*.020f,w+20f,y-h*.055f)}
+        drawPath(path,Brush.horizontalGradient(listOf(Color.Transparent,Cyan.copy(.42f),Purple.copy(.46f),Color.Transparent)),style=Stroke(2.4.dp.toPx()))
+        val y2=y+h*.026f
+        val path2=androidx.compose.ui.graphics.Path().apply{moveTo(-20f,y2);cubicTo(w*.16f,y2+h*.035f,w*.28f,y2-h*.035f,w*.47f,y2);cubicTo(w*.64f,y2+h*.040f,w*.80f,y2-h*.040f,w+20f,y2-h*.02f)}
+        drawPath(path2,Brush.horizontalGradient(listOf(Color.Transparent,Blue.copy(.22f),Purple.copy(.28f),Color.Transparent)),style=Stroke(1.2.dp.toPx()))
+        repeat(14){i->val x=((i*73)%100)/100f*w;val yy=((i*47)%100)/100f*h;drawCircle(if(i%2==0)Cyan.copy(.24f)else Purple.copy(.22f),1.dp.toPx(),Offset(x,yy+(phase-.5f)*3f))}
     }
 }
 
 @Composable
-private fun HomeHeaderButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, accent: Color, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        NeonSurface(Modifier.size(58.dp).clip(RoundedCornerShape(18.dp)).clickable(onClick = onClick), accent, 18.dp) {
-            Icon(icon, label, tint = accent, modifier = Modifier.padding(14.dp))
+private fun ReferenceMicButton(active:Boolean, enabled:Boolean, onClick:()->Unit) {
+    val t=rememberInfiniteTransition(label="reference-mic")
+    val pulse by t.animateFloat(1f,1.08f,infiniteRepeatable(tween(if(active)600 else 1400),RepeatMode.Reverse),label="pulse")
+    Box(Modifier.fillMaxWidth().height(112.dp).clickable(enabled=enabled,onClick=onClick),contentAlignment=Alignment.Center){
+        Canvas(Modifier.fillMaxSize()){
+            val cx=size.width/2f; val cy=size.height*.50f; val r=38.dp.toPx()*pulse
+            repeat(13){i->val x=cx-145.dp.toPx()+i*11.dp.toPx();val amp=(10+((i*7)%18)).dp.toPx();val alpha=if(enabled).55f else .18f;drawLine(Cyan.copy(alpha),Offset(x,cy-amp),Offset(x,cy+amp),1.dp.toPx(),cap=StrokeCap.Round);val xr=cx+145.dp.toPx()-i*11.dp.toPx();drawLine(Purple.copy(alpha),Offset(xr,cy-amp*.8f),Offset(xr,cy+amp*.8f),1.dp.toPx(),cap=StrokeCap.Round)}
+            drawCircle(Brush.radialGradient(listOf(Cyan.copy(.25f),Purple.copy(.13f),Color.Transparent),Offset(cx,cy),r*2.1f),r*2.1f,Offset(cx,cy));drawCircle(Panel2,r,Offset(cx,cy));drawCircle(Cyan.copy(.95f),r,Offset(cx,cy),style=Stroke(2.8.dp.toPx()));drawCircle(Purple.copy(.92f),r*.88f,Offset(cx,cy),style=Stroke(1.8.dp.toPx()));drawCircle(Blue.copy(.72f),r*.76f,Offset(cx,cy),style=Stroke(1.dp.toPx()))
         }
-        Text(text=label, modifier=Modifier.padding(top=4.dp), color=Muted, fontSize=7.sp, letterSpacing=2.sp)
+        Icon(if(active)Icons.Default.Stop else Icons.Default.Mic,"Microphone",tint=White.copy(if(enabled)1f else .45f),modifier=Modifier.size(39.dp))
     }
 }
-
-@Composable
-private fun NeonMicButton(active: Boolean, onClick: () -> Unit) {
-    val t = rememberInfiniteTransition(label = "mic")
-    val pulse by t.animateFloat(1f, 1.10f, infiniteRepeatable(tween(if (active) 650 else 1300), RepeatMode.Reverse), label = "pulse")
-    Box(Modifier.size(154.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val c = Offset(size.width / 2f, size.height / 2f)
-            val r = size.minDimension * .34f * pulse
-            drawCircle(Brush.radialGradient(listOf(Cyan.copy(.22f), Purple.copy(.10f), Color.Transparent), c, r * 2.2f), r * 2.2f, c)
-            drawCircle(Panel2, r, c)
-            drawCircle(Cyan.copy(.85f), r, c, style = Stroke(2.8f))
-            drawCircle(Purple.copy(.9f), r * .86f, c, style = Stroke(1.6f))
-            drawCircle(Blue.copy(.7f), r * .72f, c, style = Stroke(1f))
-        }
-        Icon(if (active) Icons.Default.Stop else Icons.Default.Mic, "Microphone", tint = White, modifier = Modifier.size(42.dp))
-    }
-}
-
 @Composable
 private fun ModelHome(onBack: () -> Unit, onAllModels: () -> Unit, onSpeech: () -> Unit, onImport: () -> Unit) {
     var showRequirements by rememberSaveable { mutableStateOf(false) }
@@ -486,22 +396,10 @@ private fun AllModels(onBack: () -> Unit) {
     var downloading by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Only the verified, locally actionable runtime model is shown here.
+    // Cloud/demo placeholders are intentionally omitted.
     val rows = listOf(
-        Triple("GPT-4o Mini", "Fast & capable model", "~3.2 GB"),
-        Triple("GPT-4o", "Most powerful model for reasoning", "7.6 GB"),
-        Triple("Gemini 1.5 Flash", "Fast multimodal model by Google", "~2.1 GB"),
-        Triple("Gemini 1.5 Pro", "Advanced multimodal model", "~4.8 GB"),
-        Triple("Llama 3.2 1B", "Lightweight & mobile friendly", "~1.1 GB"),
-        Triple("Llama 3.1 8B", "Powerful open source model", "~4.7 GB"),
-        Triple("Qwen 2.5 0.5B", "Efficient coding & chat model", "~0.8 GB"),
-        Triple("Qwen 2.5 1.5B", "Balanced coding model", "~1.4 GB"),
-        Triple("DeepSeek Coder 1.3B", "Specialized for code generation", "~1.3 GB"),
-        Triple("DeepSeek Chat 7B", "General purpose chat model", "~4.1 GB"),
-        Triple("Mistral 7B Instruct", "High quality open model", "~4.0 GB"),
-        Triple("Mixtral 8x7B", "Advanced mixture of experts", "~26 GB"),
-        Triple("Phi 3 Mini", "Small & highly capable", "~2.3 GB"),
-        Triple("Phi 3 Medium", "Better reasoning & performance", "~5.6 GB"),
-        Triple("Yi 1.5 6B", "Multilingual model", "~3.9 GB")
+        Triple("Qwen 2.5 1.5B", "Balanced local chat model • GGUF Q4_K_M", "~1.1 GB")
     )
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 15.dp, vertical = 8.dp)) {
         NeonHeader("AI All Model Download Select", "Choose and download AI models for offline use", onBack, Icons.Default.PhoneAndroid, Green, onIconClick = { showRequirements = true })
