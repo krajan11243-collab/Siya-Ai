@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -25,8 +26,10 @@ class LlmExecutor(
 
     fun warmUp() {
         if (closed.get()) return
-        scope.launch {
+        currentJob?.cancel()
+        currentJob = scope.launch {
             runCatching {
+                currentCoroutineContext().ensureActive()
                 val loaded = engine ?: engineFactory().also {
                     it.load()
                     engine = it
