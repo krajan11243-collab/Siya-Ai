@@ -140,18 +140,18 @@ private fun PixelHome(
             VoiceSessionState.Phase.ERROR -> "Something needs attention"
             VoiceSessionState.Phase.IDLE -> "Tap to Speak"
         }
-        Text(status, Modifier.fillMaxWidth(), White, 21.sp, FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(text=status, modifier=Modifier.fillMaxWidth(), color=White, fontSize=21.sp, fontWeight=FontWeight.Bold, textAlign=TextAlign.Center)
         if (voice.response.isNotBlank() && voice.phase == VoiceSessionState.Phase.READY) {
             NeonSurface(Modifier.fillMaxWidth().padding(top = 8.dp), Cyan, 15.dp) {
-                Text(voice.response, Modifier.padding(12.dp), White, 12.sp, maxLines = 2)
+                Text(text=voice.response, modifier=Modifier.padding(12.dp), color=White, fontSize=12.sp, maxLines=2)
             }
         }
-        Text("Hindi  •  Hinglish  •  English", Modifier.fillMaxWidth().padding(top = 7.dp), Muted, 12.sp, textAlign = TextAlign.Center)
+        Text(text="Hindi  •  Hinglish  •  English", modifier=Modifier.fillMaxWidth().padding(top=7.dp), color=Muted, fontSize=12.sp, textAlign=TextAlign.Center)
         Spacer(Modifier.height(10.dp))
         NeonMicButton(active = voice.active, onClick = onVoice)
-        Text(if (!microphoneGranted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak",
+        Text(text=if (!microphoneGranted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak",
             Modifier.fillMaxWidth().padding(top = 5.dp), Muted, 10.sp, textAlign = TextAlign.Center)
-        Text("—   A L W A Y S   W I T H   Y O U   —", Modifier.fillMaxWidth().padding(top = 8.dp), Blue, 8.sp, letterSpacing = 2.3.sp, textAlign = TextAlign.Center)
+        Text(text="—   A L W A Y S   W I T H   Y O U   —", modifier=Modifier.fillMaxWidth().padding(top=8.dp), color=Blue, fontSize=8.sp, letterSpacing=2.3.sp, textAlign=TextAlign.Center)
     }
 }
 
@@ -161,7 +161,7 @@ private fun HomeHeaderButton(icon: androidx.compose.ui.graphics.vector.ImageVect
         NeonSurface(Modifier.size(58.dp).clip(RoundedCornerShape(18.dp)).clickable(onClick = onClick), accent, 18.dp) {
             Icon(icon, label, tint = accent, modifier = Modifier.padding(14.dp))
         }
-        Text(label, Modifier.padding(top = 4.dp), Muted, 7.sp, letterSpacing = 2.sp)
+        Text(text=label, modifier=Modifier.padding(top=4.dp), color=Muted, fontSize=7.sp, letterSpacing=2.sp)
     }
 }
 
@@ -198,7 +198,7 @@ private fun ModelHome(onBack: () -> Unit, onAllModels: () -> Unit, onSpeech: () 
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Info, null, Cyan, Modifier.size(31.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("Model downloads run in a foreground service and continue while Siya Ai is closed. Progress stays in the notification.", Muted, 12.sp)
+                Text(text="Model downloads run in a foreground service and continue while Siya Ai is closed. Progress stays in the notification.", color=Muted, fontSize=12.sp)
             }
         }
         Spacer(Modifier.weight(1f))
@@ -212,9 +212,9 @@ private fun ModelHomeCard(title: String, subtitle: String, detail: String, accen
             NeonIconBox(icon, accent, 72.dp)
             Spacer(Modifier.width(18.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, White, 20.sp, FontWeight.Bold)
-                Text(subtitle, Muted, 13.sp, Modifier.padding(top = 5.dp))
-                if (detail.isNotBlank()) Text(detail, Muted, 12.sp, Modifier.padding(top = 2.dp))
+                Text(text=title, color=White, fontSize=20.sp, fontWeight=FontWeight.Bold)
+                Text(text=subtitle, color=Muted, fontSize=13.sp, modifier=Modifier.padding(top=5.dp))
+                if (detail.isNotBlank()) Text(text=detail, color=Muted, fontSize=12.sp, modifier=Modifier.padding(top=2.dp))
             }
             NeonArrow(accent)
         }
@@ -255,9 +255,9 @@ private fun AllModels(onBack: () -> Unit) {
                     if (isQwen) { { installed = false; store.delete() } } else null)
             }
         }
-        if (error != null) Text(error!!, Red, 11.sp, Modifier.padding(4.dp))
+        if (error != null) Text(text=error!!, color=Red, fontSize=11.sp, modifier=Modifier.padding(4.dp))
         NeonSurface(Modifier.fillMaxWidth(), Blue, 14.dp) {
-            Text("Only real local runtime/download paths are actionable. Cloud-only models are not presented as fake offline downloads.", Modifier.padding(11.dp), Muted, 10.sp)
+            Text(text="Only real local runtime/download paths are actionable. Cloud-only models are not presented as fake offline downloads.", modifier=Modifier.padding(11.dp), color=Muted, fontSize=10.sp)
         }
     }
 }
@@ -301,8 +301,8 @@ private fun SpeechModels(onBack: () -> Unit) {
             }
             item { SpeechRow("Kokoro TTS", "Sherpa-ONNX local neural voice adapter", if (tts.isInstalled()) "READY" else "IMPORT", Purple, tts.isInstalled(), false, 0f) {} }
         }
-        error?.let { Text(it, Red, 11.sp, Modifier.padding(bottom = 7.dp)) }
-        NeonSurface(Modifier.fillMaxWidth(), Cyan, 14.dp) { Text("Pipeline: MIC  →  VAD  →  Hindi STT  →  Local LLM  →  TTS", Modifier.padding(12.dp), Muted, 11.sp) }
+        error?.let { Text(text=it, color=Red, fontSize=11.sp, modifier=Modifier.padding(bottom=7.dp)) }
+        NeonSurface(Modifier.fillMaxWidth(), Cyan, 14.dp) { Text(text="Pipeline: MIC  →  VAD  →  Hindi STT  →  Local LLM  →  TTS", modifier=Modifier.padding(12.dp), color=Muted, fontSize=11.sp) }
     }
 }
 
@@ -313,13 +313,13 @@ private fun SpeechRow(title:String, subtitle:String, size:String, accent:Color, 
             Row(verticalAlignment=Alignment.CenterVertically) {
                 NeonIconBox(Icons.Default.GraphicEq, accent, 47.dp)
                 Spacer(Modifier.width(11.dp))
-                Column(Modifier.weight(1f)) { Text(title, White, 14.sp, FontWeight.Bold); Text(subtitle, Muted, 10.sp) }
-                Text(size, Muted, 10.sp, textAlign=TextAlign.End)
+                Column(Modifier.weight(1f)) { Text(text=title, color=White, fontSize=14.sp, fontWeight=FontWeight.Bold); Text(text=subtitle, color=Muted, fontSize=10.sp) }
+                Text(text=size, color=Muted, fontSize=10.sp, textAlign=TextAlign.End)
             }
             Spacer(Modifier.height(9.dp))
             if (busy) {
                 LinearProgressIndicator(progress={progress}, modifier=Modifier.fillMaxWidth().height(5.dp), color=accent, trackColor=Panel2)
-                Text((progress*100).toInt().toString()+"%  Downloading…", accent, 9.sp, Modifier.padding(top=4.dp))
+                Text(text=(progress*100).toInt().toString()+"%  Downloading…", color=accent, fontSize=9.sp, modifier=Modifier.padding(top=4.dp))
             } else {
                 OutlinedButton(onClick=onClick, enabled=!installed, modifier=Modifier.fillMaxWidth().height(40.dp), shape=RoundedCornerShape(12.dp), border=BorderStroke(1.dp,accent.copy(.7f)), colors=ButtonDefaults.outlinedButtonColors(contentColor=accent)) {
                     Icon(if(installed) Icons.Default.Check else Icons.Default.Download, null, Modifier.size(17.dp))
@@ -339,23 +339,23 @@ private fun ModelRow(title:String, subtitle:String, size:String, accent:Color, i
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    Text(title,White,13.sp,FontWeight.Bold)
+                    Text(text=title,color=White,fontSize=13.sp,fontWeight=FontWeight.Bold)
                     Spacer(Modifier.width(7.dp))
-                    Surface(shape=RoundedCornerShape(10.dp),color=accent.copy(.10f),border=BorderStroke(1.dp,accent.copy(.65f))) { Text("LOCAL",Modifier.padding(horizontal=6.dp,vertical=2.dp),accent,7.sp,FontWeight.Bold) }
+                    Surface(shape=RoundedCornerShape(10.dp),color=accent.copy(.10f),border=BorderStroke(1.dp,accent.copy(.65f))) { Text(text="LOCAL",modifier=Modifier.padding(horizontal=6.dp,vertical=2.dp),color=accent,fontSize=7.sp,fontWeight=FontWeight.Bold) }
                 }
-                Text(subtitle,Muted,9.sp,Modifier.padding(top=2.dp))
+                Text(text=subtitle,color=Muted,fontSize=9.sp,modifier=Modifier.padding(top=2.dp))
                 if(downloading){
                     LinearProgressIndicator(progress={progress},Modifier.fillMaxWidth().padding(top=6.dp).height(4.dp),color=accent,trackColor=Panel2)
-                    Text((progress*100).toInt().toString()+"%  Downloading…",accent,8.sp,Modifier.padding(top=2.dp))
+                    Text(text=(progress*100).toInt().toString()+"%  Downloading…",color=accent,fontSize=8.sp,modifier=Modifier.padding(top=2.dp))
                 }
             }
             Spacer(Modifier.width(7.dp))
             Column(horizontalAlignment=Alignment.End) {
-                Text(size,Muted,9.sp)
+                Text(text=size,color=Muted,fontSize=9.sp)
                 Spacer(Modifier.height(5.dp))
-                if(installed) Surface(shape=RoundedCornerShape(10.dp),color=Green.copy(.12f),border=BorderStroke(1.dp,Green.copy(.7f))) { Text("✓ READY",Modifier.padding(horizontal=8.dp,vertical=7.dp),Green,8.sp,FontWeight.Bold) }
-                else if(enabled) Button(onClick=onDownload,enabled=!downloading,modifier=Modifier.height(37.dp),contentPadding=PaddingValues(horizontal=10.dp),shape=RoundedCornerShape(11.dp),colors=ButtonDefaults.buttonColors(containerColor=accent.copy(.18f),contentColor=White)) { Icon(Icons.Default.Download,null,Modifier.size(15.dp));Spacer(Modifier.width(4.dp));Text(if(downloading)"STOP" else "Download",9.sp,fontWeight=FontWeight.Bold) }
-                else Surface(shape=RoundedCornerShape(10.dp),color=Panel2,border=BorderStroke(1.dp,Color.White.copy(.08f))) { Text("NOT CONFIGURED",Modifier.padding(horizontal=7.dp,vertical=7.dp),Muted,7.sp,FontWeight.Bold) }
+                if(installed) Surface(shape=RoundedCornerShape(10.dp),color=Green.copy(.12f),border=BorderStroke(1.dp,Green.copy(.7f))) { Text(text="✓ READY",modifier=Modifier.padding(horizontal=8.dp,vertical=7.dp),color=Green,fontSize=8.sp,fontWeight=FontWeight.Bold) }
+                else if(enabled) Button(onClick=onDownload,enabled=!downloading,modifier=Modifier.height(37.dp),contentPadding=PaddingValues(horizontal=10.dp),shape=RoundedCornerShape(11.dp),colors=ButtonDefaults.buttonColors(containerColor=accent.copy(.18f),contentColor=White)) { Icon(Icons.Default.Download,null,Modifier.size(15.dp));Spacer(Modifier.width(4.dp));Text(text=if(downloading)"STOP" else "Download",fontSize=9.sp,fontWeight=FontWeight.Bold) }
+                else Surface(shape=RoundedCornerShape(10.dp),color=Panel2,border=BorderStroke(1.dp,Color.White.copy(.08f))) { Text(text="NOT CONFIGURED",modifier=Modifier.padding(horizontal=7.dp,vertical=7.dp),color=Muted,fontSize=7.sp,fontWeight=FontWeight.Bold) }
                 onDelete?.let { IconButton(onClick=it,modifier=Modifier.size(29.dp)){Icon(Icons.Default.Delete,"Delete",Red,Modifier.size(15.dp))} }
             }
         }
@@ -380,13 +380,13 @@ private fun ImportModelPage(onBack:()->Unit) {
             Column(Modifier.padding(22.dp),horizontalAlignment=Alignment.CenterHorizontally){
                 NeonIconBox(Icons.Default.UploadFile,Purple,76.dp)
                 Spacer(Modifier.height(13.dp))
-                Text("Qwen 2.5 1.5B Instruct Q4_K_M",White,17.sp,FontWeight.Bold,textAlign=TextAlign.Center)
-                Text("SHA-256 verified import • local storage",Muted,11.sp,Modifier.padding(top=5.dp),textAlign=TextAlign.Center)
+                Text(text="Qwen 2.5 1.5B Instruct Q4_K_M",color=White,fontSize=17.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center)
+                Text(text="SHA-256 verified import • local storage",color=Muted,fontSize=11.sp,modifier=Modifier.padding(top=5.dp),textAlign=TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
                 Button(onClick={launcher.launch(arrayOf("application/octet-stream","application/*"))},modifier=Modifier.fillMaxWidth().height(48.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple),shape=RoundedCornerShape(14.dp)){
                     Icon(Icons.Default.FolderOpen,null);Spacer(Modifier.width(7.dp));Text("Select GGUF")
                 }
-                Text(status,Muted,10.sp,Modifier.padding(top=10.dp),textAlign=TextAlign.Center)
+                Text(text=status,color=Muted,fontSize=10.sp,modifier=Modifier.padding(top=10.dp),textAlign=TextAlign.Center)
             }
         }
     }
@@ -417,8 +417,8 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
                 NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(Icons.AutoMirrored.Filled.ArrowBack,"Back",White,Modifier.padding(11.dp))}
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
-                    Row(verticalAlignment=Alignment.CenterVertically){Text("Siya",White,28.sp,FontWeight.Bold);Text(" Ai",Cyan,28.sp,FontWeight.Bold)}
-                    Text("Y O U R   A I   C O M P A N I O N",Muted,7.sp,letterSpacing=2.2.sp)
+                    Row(verticalAlignment=Alignment.CenterVertically){Text(text="Siya",color=White,fontSize=28.sp,fontWeight=FontWeight.Bold);Text(text=" Ai",color=Cyan,fontSize=28.sp,fontWeight=FontWeight.Bold)}
+                    Text(text="Y O U R   A I   C O M P A N I O N",color=Muted,fontSize=7.sp,letterSpacing=2.2.sp)
                 }
                 NeonSurface(Modifier.size(48.dp).clickable{menu=true},Purple,15.dp){Icon(Icons.Default.Menu,"Menu",Purple,Modifier.padding(11.dp))}
             }
@@ -427,7 +427,7 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
                 if(messages.isEmpty())item{AssistantBubble("Hello! 👋\nमैं Siya Ai हूँ\nमैं आपकी कैसे मदद कर सकती हूँ?")}
                 items(messages){m->if(m.first)UserBubble(m.second)else AssistantBubble(m.second)}
             }
-            if(attached!=null){Surface(shape=RoundedCornerShape(10.dp),color=Panel2,border=BorderStroke(1.dp,Cyan.copy(.45f))){Text("📎 "+attached!!,Modifier.padding(7.dp),Cyan,9.sp,maxLines=1)};Spacer(Modifier.height(5.dp))}
+            if(attached!=null){Surface(shape=RoundedCornerShape(10.dp),color=Panel2,border=BorderStroke(1.dp,Cyan.copy(.45f))){Text(text="📎 "+attached!!,modifier=Modifier.padding(7.dp),color=Cyan,fontSize=9.sp,maxLines=1)};Spacer(Modifier.height(5.dp))}
             Row(Modifier.fillMaxWidth().padding(bottom=5.dp),verticalAlignment=Alignment.Bottom){
                 NeonSurface(Modifier.size(48.dp).clickable{picker.launch(arrayOf("*/*"))},Purple,15.dp){Icon(Icons.Default.AttachFile,"Attach",White,Modifier.padding(12.dp))}
                 Spacer(Modifier.width(7.dp))
@@ -459,7 +459,7 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
 @Composable
 private fun MenuItem(text:String,icon:androidx.compose.ui.graphics.vector.ImageVector,onClick:()->Unit){
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick=onClick).padding(11.dp),verticalAlignment=Alignment.CenterVertically){
-        Icon(icon,null,Cyan,Modifier.size(20.dp));Spacer(Modifier.width(9.dp));Text(text,White,11.sp)
+        Icon(icon,null,Cyan,Modifier.size(20.dp));Spacer(Modifier.width(9.dp));Text(text=text,color=White,fontSize=11.sp)
     }
 }
 
@@ -468,7 +468,7 @@ private fun AssistantBubble(text:String){
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Top){
         NeonAvatar();Spacer(Modifier.width(8.dp))
         NeonSurface(Modifier.widthIn(max=310.dp),Cyan,19.dp){
-            Column(Modifier.padding(13.dp)){Text("Siya Ai",Cyan,12.sp,FontWeight.Bold);Text(text,White,15.sp,Modifier.padding(top=6.dp))}
+            Column(Modifier.padding(13.dp)){Text(text="Siya Ai",color=Cyan,fontSize=12.sp,fontWeight=FontWeight.Bold);Text(text=text,color=White,fontSize=15.sp,modifier=Modifier.padding(top=6.dp))}
         }
     }
 }
@@ -476,7 +476,7 @@ private fun AssistantBubble(text:String){
 @Composable
 private fun UserBubble(text:String){
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
-        NeonSurface(Modifier.widthIn(max=330.dp),Purple,19.dp){Text(text,White,15.sp,Modifier.padding(14.dp))}
+        NeonSurface(Modifier.widthIn(max=330.dp),Purple,19.dp){Text(text=text,color=White,fontSize=15.sp,modifier=Modifier.padding(14.dp))}
     }
 }
 
@@ -499,7 +499,7 @@ private fun NeonHeader(title:String,subtitle:String,onBack:()->Unit,icon:android
     Row(Modifier.fillMaxWidth().height(66.dp),verticalAlignment=Alignment.CenterVertically){
         NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(Icons.AutoMirrored.Filled.ArrowBack,"Back",White,Modifier.padding(10.dp))}
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)){Text(title,White,25.sp,FontWeight.ExtraBold);Text(subtitle,Muted,11.sp)}
+        Column(Modifier.weight(1f)){Text(text=title,color=White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text(text=subtitle,color=Muted,fontSize=11.sp)}
         NeonSurface(Modifier.size(48.dp),accent,15.dp){Icon(imageVector=icon,contentDescription=null,tint=accent,modifier=Modifier.padding(11.dp))}
     }
 }
