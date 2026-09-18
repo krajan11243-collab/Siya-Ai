@@ -19,9 +19,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.asFrameworkPaint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -398,21 +395,27 @@ private fun ReferenceHologram(active: Boolean, modifier: Modifier = Modifier) {
         )
         drawCircle(White.copy(.98f), r * (.055f + pulse * .018f), Offset(cx, cy))
 
-        // Native shadow layer adds an additional high-intensity neon halo.
-        drawIntoCanvas { canvas ->
-            val paint = Paint().apply {
-                style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                strokeWidth = 2.dp.toPx()
-            }
-            val framework = paint.asFrameworkPaint()
-            framework.isAntiAlias = true
-            framework.color = Cyan.toArgb()
-            framework.setShadowLayer(18.dp.toPx(), 0f, 0f, Cyan.toArgb())
-            canvas.drawCircle(Offset(cx, cy), orbRadius * 1.03f, paint)
-            framework.color = Purple.toArgb()
-            framework.setShadowLayer(22.dp.toPx(), 0f, 0f, Purple.toArgb())
-            canvas.drawCircle(Offset(cx, cy), orbRadius * 1.13f, paint)
-        }
+        // Layered radial/gradient illumination provides the neon shader-like halo
+        // without relying on device-specific native Canvas shadow APIs.
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(Cyan.copy(.24f + pulse * .10f), Blue.copy(.10f), Color.Transparent),
+                Offset(cx, cy),
+                orbRadius * 1.65f
+            ),
+            radius = orbRadius * 1.65f,
+            center = Offset(cx, cy)
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(Purple.copy(.18f + pulse * .08f), Color.Transparent),
+                Offset(cx, cy),
+                orbRadius * 1.42f
+            ),
+            radius = orbRadius * 1.42f,
+            center = Offset(cx, cy)
+        )
+
     }
 }
 
