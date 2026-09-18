@@ -132,6 +132,8 @@ private fun ResponsiveHome(
             VoiceSessionState.Phase.LISTENING -> "Listening…"
             VoiceSessionState.Phase.TRANSCRIBING -> "Understanding…"
             VoiceSessionState.Phase.THINKING -> "Siya is thinking…"
+            VoiceSessionState.Phase.SPEAKING -> "Siya is speaking…"
+            VoiceSessionState.Phase.INTERRUPTING -> "Listening…"
             VoiceSessionState.Phase.READY -> "Ready"
             VoiceSessionState.Phase.ERROR -> "Something needs attention"
             VoiceSessionState.Phase.IDLE -> "Tap to Speak"
