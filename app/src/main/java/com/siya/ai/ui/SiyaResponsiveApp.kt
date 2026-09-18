@@ -364,8 +364,16 @@ private fun ModelRow(title:String, subtitle:String, size:String, accent:Color, i
                 Text(text=size,color=Muted,fontSize=9.sp)
                 Spacer(Modifier.height(5.dp))
                 if(installed) Surface(shape=RoundedCornerShape(10.dp),color=Green.copy(.12f),border=BorderStroke(1.dp,Green.copy(.7f))) { Text(text="✓ READY",modifier=Modifier.padding(horizontal=8.dp,vertical=7.dp),color=Green,fontSize=8.sp,fontWeight=FontWeight.Bold) }
-                else if(enabled) Button(onClick=onDownload,enabled=!downloading,modifier=Modifier.height(37.dp),contentPadding=PaddingValues(horizontal=10.dp),shape=RoundedCornerShape(11.dp),colors=ButtonDefaults.buttonColors(containerColor=accent.copy(.18f),contentColor=White)) { Icon(Icons.Default.Download,null,Modifier.size(15.dp));Spacer(Modifier.width(4.dp));Text(text=if(downloading)"STOP" else "Download",fontSize=9.sp,fontWeight=FontWeight.Bold) }
-                else Surface(shape=RoundedCornerShape(10.dp),color=Panel2,border=BorderStroke(1.dp,Color.White.copy(.08f))) { Text(text="NOT CONFIGURED",modifier=Modifier.padding(horizontal=7.dp,vertical=7.dp),color=Muted,fontSize=7.sp,fontWeight=FontWeight.Bold) }
+                else if(enabled) NeonSurface(Modifier.height(37.dp).width(126.dp).clickable(enabled=!downloading,onClick=onDownload),accent,11.dp) {
+                    Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.Center) {
+                        Icon(imageVector=if(downloading) Icons.Default.Pause else Icons.Default.Download,contentDescription=null,tint=White,modifier=Modifier.size(15.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(text=if(downloading)"STOP" else "Download",color=White,fontSize=9.sp,fontWeight=FontWeight.Bold)
+                    }
+                }
+                else NeonSurface(Modifier.height(37.dp).width(126.dp),accent.copy(.28f),11.dp) {
+                    Text(text="Download",color=Muted,fontSize=9.sp,fontWeight=FontWeight.Bold)
+                }
                 onDelete?.let { IconButton(onClick=it,modifier=Modifier.size(29.dp)){Icon(imageVector=Icons.Default.Delete,contentDescription="Delete",tint=Red,modifier=Modifier.size(15.dp))} }
             }
         }
@@ -526,7 +534,48 @@ private fun NeonArrow(accent:Color){
 
 @Composable
 private fun NeonSurface(modifier:Modifier,accent:Color,shapeDp:androidx.compose.ui.unit.Dp,content: @Composable () -> Unit){
-    Surface(modifier=modifier,shape=RoundedCornerShape(shapeDp),color=Panel.copy(.92f),border=BorderStroke(1.dp,accent.copy(.60f)),shadowElevation=0.dp,content=content)
+    val transition = rememberInfiniteTransition(label = "neon-surface")
+    val glow by transition.animateFloat(
+        initialValue = 0.38f,
+        targetValue = 0.72f,
+        animationSpec = infiniteRepeatable(tween(1700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "glow"
+    )
+    val shape = RoundedCornerShape(shapeDp)
+    Box(
+        modifier = modifier
+            .drawBehind {
+                val inset = 2.dp.toPx()
+                drawRoundRect(
+                    color = accent.copy(alpha = glow * 0.20f),
+                    topLeft = Offset(-inset, -inset),
+                    size = androidx.compose.ui.geometry.Size(size.width + inset * 2f, size.height + inset * 2f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(shapeDp.toPx() + inset),
+                    style = Stroke(width = 6.dp.toPx())
+                )
+                drawRoundRect(
+                    brush = Brush.linearGradient(listOf(accent.copy(.92f), Cyan.copy(.62f), accent.copy(.92f))),
+                    topLeft = Offset(0f, 0f),
+                    size = size,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(shapeDp.toPx()),
+                    style = Stroke(width = 1.2.dp.toPx())
+                )
+            }
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        accent.copy(alpha = .13f),
+                        Panel.copy(alpha = .97f),
+                        Deep.copy(alpha = .98f),
+                        accent.copy(alpha = .08f)
+                    )
+                ),
+                shape
+            )
+            .border(BorderStroke(0.8.dp, accent.copy(.42f)), shape),
+        contentAlignment = Alignment.Center
+    ) { content() }
 }
 
 @Composable
