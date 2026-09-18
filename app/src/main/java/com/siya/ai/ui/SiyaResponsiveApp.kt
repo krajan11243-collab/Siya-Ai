@@ -230,17 +230,28 @@ private fun AllModels(onBack: () -> Unit) {
     var progress by remember { mutableFloatStateOf(0f) }
     var error by remember { mutableStateOf<String?>(null) }
     val rows = listOf(
-        Triple("Qwen 2.5 1.5B", "Balanced local assistant model", "~1.12 GB"),
-        Triple("Llama 3.2 1B", "Lightweight mobile model", "Not configured"),
-        Triple("DeepSeek Coder 1.3B", "Specialized coding model", "Not configured"),
-        Triple("Kokoro TTS", "Local speech synthesis backend", "Import package")
+        Triple("GPT-4o Mini", "Fast & capable model", "~3.2 GB"),
+        Triple("GPT-4o", "Most powerful model for reasoning", "7.6 GB"),
+        Triple("Gemini 1.5 Flash", "Fast multimodal model by Google", "~2.1 GB"),
+        Triple("Gemini 1.5 Pro", "Advanced multimodal model", "~4.8 GB"),
+        Triple("Llama 3.2 1B", "Lightweight & mobile friendly", "~1.1 GB"),
+        Triple("Llama 3.1 8B", "Powerful open source model", "~4.7 GB"),
+        Triple("Qwen 2.5 0.5B", "Efficient coding & chat model", "~0.8 GB"),
+        Triple("Qwen 2.5 1.5B", "Balanced coding model", "~1.4 GB"),
+        Triple("DeepSeek Coder 1.3B", "Specialized for code generation", "~1.3 GB"),
+        Triple("DeepSeek Chat 7B", "General purpose chat model", "~4.1 GB"),
+        Triple("Mistral 7B Instruct", "High quality open model", "~4.0 GB"),
+        Triple("Mixtral 8x7B", "Advanced mixture of experts", "~26 GB"),
+        Triple("Phi 3 Mini", "Small & highly capable", "~2.3 GB"),
+        Triple("Phi 3 Medium", "Better reasoning & performance", "~5.6 GB"),
+        Triple("Yi 1.5 6B", "Multilingual model", "~3.9 GB")
     )
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 15.dp, vertical = 8.dp)) {
         NeonHeader("AI All Model Download Select", "Choose and download AI models for offline use", onBack, Icons.Default.PhoneAndroid, Green)
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             items(rows) { row ->
-                val isQwen = row.first.startsWith("Qwen")
-                ModelRow(row.first, row.second, row.third, if (isQwen) Purple else Cyan, isQwen && installed, isQwen && downloading, if (isQwen) progress else 0f, isQwen,
+                val isQwen = row.first == "Qwen 2.5 1.5B"
+                ModelRow(row.first, row.second, row.third, if (row.first.contains("Gemini")) Blue else if (row.first.contains("GPT")) Cyan else if (row.first.contains("Llama") || row.first.contains("DeepSeek")) Cyan else Purple, isQwen && installed, isQwen && downloading, if (isQwen) progress else 0f, isQwen,
                     {
                         scope.launch {
                             downloading = true; error = null; progress = 0f
