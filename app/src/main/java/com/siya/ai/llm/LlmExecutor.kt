@@ -57,7 +57,7 @@ class LlmExecutor(
         engine?.cancelGeneration()
         currentJob?.cancel()
         currentJob = scope.launch {
-            val result = try {
+            val result: Result<LlmResult> = try {
                 currentCoroutineContext().ensureActive()
                 // If warm-up is still loading, wait for it rather than starting
                 // another native model load.
@@ -78,7 +78,7 @@ class LlmExecutor(
             } catch (cancelled: CancellationException) {
                 return@launch
             } catch (error: Throwable) {
-                Result.failure(error)
+                Result.failure<LlmResult>(error)
             }
             if (!closed.get() && myTurn == turnId.get() && currentCoroutineContext().isActive) {
                 onResult(result)
