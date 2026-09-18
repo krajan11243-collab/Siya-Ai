@@ -178,6 +178,128 @@ private fun PixelHome(
     }
 }
 @Composable
+private fun ProHologram(active: Boolean, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "hologram")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(if (active) 1800 else 5200, easing = FastOutSlowInEasing), RepeatMode.Restart),
+        label = "phase"
+    )
+    val breathe by transition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(tween(if (active) 850 else 1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "breathe"
+    )
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        val cy = h * 0.47f
+        val base = minOf(w, h) * 0.30f * breathe
+        val glow = Brush.radialGradient(
+            listOf(Cyan.copy(if (active) .24f else .16f), Purple.copy(.12f), Color.Transparent),
+            Offset(cx, cy), base * 2.25f
+        )
+        drawCircle(glow, base * 2.25f, Offset(cx, cy))
+
+        // Precision grid / crosshair.
+        drawLine(Cyan.copy(.16f), Offset(cx, cy - base * 2.05f), Offset(cx, cy + base * 2.05f), 1.dp.toPx())
+        drawLine(Cyan.copy(.14f), Offset(cx - base * 2.05f, cy), Offset(cx + base * 2.05f, cy), 1.dp.toPx())
+
+        // Layered holographic core.
+        drawCircle(
+            Brush.radialGradient(listOf(White.copy(.34f), Cyan.copy(.18f), Purple.copy(.10f), Color.Transparent), Offset(cx, cy), base),
+            base, Offset(cx, cy)
+        )
+        listOf(.52f, .74f, .98f, 1.22f, 1.48f).forEachIndexed { index, scale ->
+            drawCircle(
+                if (index % 2 == 0) Cyan.copy(.22f) else Purple.copy(.20f),
+                base * scale,
+                Offset(cx, cy),
+                style = Stroke((if (index < 2) 1.8f else 1f).dp.toPx())
+            )
+        }
+
+        // Orbit rings at different tilts.
+        val orbitColors = listOf(Cyan.copy(.78f), Purple.copy(.70f), Blue.copy(.48f), Cyan.copy(.34f), Purple.copy(.38f))
+        val angles = listOf(-18f, 28f, 66f, -55f, 10f)
+        angles.forEachIndexed { index, angle ->
+            val ovalW = base * (2.05f + index * .16f)
+            val ovalH = base * (.55f + index * .08f)
+            drawOval(
+                brush = Brush.horizontalGradient(listOf(Color.Transparent, orbitColors[index], Color.Transparent)),
+                topLeft = Offset(cx - ovalW / 2f, cy - ovalH / 2f),
+                size = androidx.compose.ui.geometry.Size(ovalW, ovalH),
+                style = Stroke((if (index < 2) 2.1f else 1.1f).dp.toPx())
+            )
+        }
+
+        // Rotating bright arc segments.
+        val sweep = phase * 360f
+        drawArc(Cyan.copy(.95f), sweep, 92f, false,
+            Offset(cx - base * 1.48f, cy - base * 1.48f),
+            androidx.compose.ui.geometry.Size(base * 2.96f, base * 2.96f),
+            style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
+        drawArc(Purple.copy(.92f), sweep + 180f, 78f, false,
+            Offset(cx - base * 1.62f, cy - base * 1.62f),
+            androidx.compose.ui.geometry.Size(base * 3.24f, base * 3.24f),
+            style = Stroke(3.2.dp.toPx(), cap = StrokeCap.Round))
+        drawArc(Blue.copy(.75f), sweep + 285f, 42f, false,
+            Offset(cx - base * 1.78f, cy - base * 1.78f),
+            androidx.compose.ui.geometry.Size(base * 3.56f, base * 3.56f),
+            style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+
+        // Orbit particles.
+        repeat(18) { index ->
+            val a = (index / 18f) * 6.28318f + phase * 6.28318f * (if (index % 2 == 0) 1f else -0.7f)
+            val rx = base * (1.12f + (index % 4) * .16f)
+            val ry = base * (.62f + (index % 3) * .13f)
+            val px = cx + kotlin.math.cos(a) * rx
+            val py = cy + kotlin.math.sin(a) * ry
+            val r = if (index % 5 == 0) 2.5f else 1.3f
+            drawCircle(if (index % 3 == 0) Purple.copy(.88f) else Cyan.copy(.82f), r.dp.toPx(), Offset(px, py))
+        }
+
+        // Fine digital tick marks around the main sphere.
+        val ticks = 48
+        repeat(ticks) { index ->
+            val a = index.toFloat() / ticks * 6.28318f
+            val inner = base * 1.63f
+            val outer = inner + if (index % 4 == 0) base * .12f else base * .055f
+            val p1 = Offset(cx + kotlin.math.cos(a) * inner, cy + kotlin.math.sin(a) * inner)
+            val p2 = Offset(cx + kotlin.math.cos(a) * outer, cy + kotlin.math.sin(a) * outer)
+            drawLine(if (index % 4 == 0) Cyan.copy(.60f) else Muted.copy(.30f), p1, p2, 1.dp.toPx())
+        }
+
+        // Projection platform.
+        val platformY = cy + base * 1.86f
+        drawOval(
+            Brush.horizontalGradient(listOf(Color.Transparent, Purple.copy(.55f), Cyan.copy(.72f), Purple.copy(.55f), Color.Transparent)),
+            Offset(cx - base * 1.62f, platformY - base * .10f),
+            androidx.compose.ui.geometry.Size(base * 3.24f, base * .20f),
+            style = Stroke(1.6.dp.toPx())
+        )
+        drawOval(
+            Brush.horizontalGradient(listOf(Color.Transparent, Cyan.copy(.45f), Purple.copy(.42f), Color.Transparent)),
+            Offset(cx - base * 1.35f, platformY - base * .035f),
+            androidx.compose.ui.geometry.Size(base * 2.70f, base * .07f),
+            style = Stroke(1.dp.toPx())
+        )
+
+        // Vertical scan beam.
+        val beamX = cx + (phase - .5f) * base * .95f
+        drawLine(Cyan.copy(.20f), Offset(beamX, cy - base * 1.95f), Offset(beamX, cy + base * 1.95f), 1.dp.toPx())
+
+        // Central energy point.
+        drawCircle(White.copy(.96f), base * .055f, Offset(cx, cy))
+        drawCircle(Cyan.copy(.88f), base * .105f, Offset(cx, cy), style = Stroke(2.dp.toPx()))
+        drawCircle(Purple.copy(.45f), base * .17f, Offset(cx, cy), style = Stroke(1.dp.toPx()))
+    }
+}
+
+@Composable
 private fun HomeAmbientBackground(){
     val transition=rememberInfiniteTransition(label="home-ambient")
     val pulse by transition.animateFloat(0f,1f,infiniteRepeatable(tween(4200,easing=FastOutSlowInEasing),RepeatMode.Reverse),label="pulse")
