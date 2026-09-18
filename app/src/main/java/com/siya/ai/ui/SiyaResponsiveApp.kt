@@ -151,7 +151,7 @@ private fun PixelHome(
         Text("L I S T E N S     •     U N D E R S T A N D S     •     C O N T R O L S",
             Modifier.fillMaxWidth().padding(top = 7.dp), color = Cyan, fontSize = 9.sp, letterSpacing = 1.6.sp, textAlign = TextAlign.Center)
         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-            ProHologram(active = voice.active, modifier = Modifier.fillMaxSize())
+            DetailedHologram(active = voice.active, modifier = Modifier.fillMaxSize())
         }
         val status = when (voice.phase) {
             VoiceSessionState.Phase.LISTENING -> "Listening…"
@@ -178,7 +178,7 @@ private fun PixelHome(
     }
 }
 @Composable
-private fun ProHologram(active: Boolean, modifier: Modifier = Modifier) {
+private fun DetailedHologram(active: Boolean, modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "hologram")
     val phase by transition.animateFloat(
         initialValue = 0f,
