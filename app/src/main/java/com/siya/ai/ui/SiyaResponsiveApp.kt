@@ -400,16 +400,18 @@ private fun ReferenceHologram(active: Boolean, modifier: Modifier = Modifier) {
 
         // Native shadow layer adds an additional high-intensity neon halo.
         drawIntoCanvas { canvas ->
-            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                style = AndroidPaint.Style.STROKE
+            val paint = Paint().apply {
+                style = androidx.compose.ui.graphics.PaintingStyle.Stroke
                 strokeWidth = 2.dp.toPx()
-                color = Cyan.value.toInt()
-                setShadowLayer(18.dp.toPx(), 0f, 0f, Cyan.toArgb())
             }
-            canvas.nativeCanvas.drawCircle(cx, cy, orbRadius * 1.03f, paint)
-            paint.color = Purple.toArgb()
-            paint.setShadowLayer(22.dp.toPx(), 0f, 0f, Purple.toArgb())
-            canvas.nativeCanvas.drawCircle(cx, cy, orbRadius * 1.13f, paint)
+            val framework = paint.asFrameworkPaint()
+            framework.isAntiAlias = true
+            framework.color = Cyan.toArgb()
+            framework.setShadowLayer(18.dp.toPx(), 0f, 0f, Cyan.toArgb())
+            canvas.drawCircle(Offset(cx, cy), orbRadius * 1.03f, paint)
+            framework.color = Purple.toArgb()
+            framework.setShadowLayer(22.dp.toPx(), 0f, 0f, Purple.toArgb())
+            canvas.drawCircle(Offset(cx, cy), orbRadius * 1.13f, paint)
         }
     }
 }
