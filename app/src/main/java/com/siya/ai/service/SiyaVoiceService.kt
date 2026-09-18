@@ -334,11 +334,15 @@ class SiyaVoiceService : Service() {
                         VadEventType.SPEECH_START -> {
                             VoiceSessionState.interrupting()
                             cancelTurnTimeout()
+                            // Cancel every previous turn, including a pending ASR job.
+                            // This is the critical barge-in path: old work must not be
+                            // allowed to answer after the user has started a new turn.
                             llmExecutor?.cancelCurrent()
+                            sttPipeline?.reset()
                             tts?.stop()
                             synchronized(streamLock) { streamBuffer.setLength(0); firstTtsChunk = true }
                             VoiceSessionState.listening()
-                            updateNotification("Speech detected • previous turn cancelled")
+                            updateNotification("Listening • previous turn cancelled")
                         }
                         VadEventType.SPEECH_END -> {
                             VoiceSessionState.transcribing()
