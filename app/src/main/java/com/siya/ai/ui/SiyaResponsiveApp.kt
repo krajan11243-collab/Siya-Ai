@@ -195,7 +195,7 @@ private fun ModelHome(onBack: () -> Unit, onAllModels: () -> Unit, onSpeech: () 
         Spacer(Modifier.height(20.dp))
         NeonSurface(Modifier.fillMaxWidth(), Blue, 16.dp) {
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Info, null, Cyan, Modifier.size(31.dp))
+                Icon(imageVector=Icons.Default.Info, contentDescription=null, tint=Cyan, modifier=Modifier.size(31.dp))
                 Spacer(Modifier.width(12.dp))
                 Text(text="Model downloads run in a foreground service and continue while Siya Ai is closed. Progress stays in the notification.", color=Muted, fontSize=12.sp)
             }
@@ -355,7 +355,7 @@ private fun ModelRow(title:String, subtitle:String, size:String, accent:Color, i
                 if(installed) Surface(shape=RoundedCornerShape(10.dp),color=Green.copy(.12f),border=BorderStroke(1.dp,Green.copy(.7f))) { Text(text="✓ READY",modifier=Modifier.padding(horizontal=8.dp,vertical=7.dp),color=Green,fontSize=8.sp,fontWeight=FontWeight.Bold) }
                 else if(enabled) Button(onClick=onDownload,enabled=!downloading,modifier=Modifier.height(37.dp),contentPadding=PaddingValues(horizontal=10.dp),shape=RoundedCornerShape(11.dp),colors=ButtonDefaults.buttonColors(containerColor=accent.copy(.18f),contentColor=White)) { Icon(Icons.Default.Download,null,Modifier.size(15.dp));Spacer(Modifier.width(4.dp));Text(text=if(downloading)"STOP" else "Download",fontSize=9.sp,fontWeight=FontWeight.Bold) }
                 else Surface(shape=RoundedCornerShape(10.dp),color=Panel2,border=BorderStroke(1.dp,Color.White.copy(.08f))) { Text(text="NOT CONFIGURED",modifier=Modifier.padding(horizontal=7.dp,vertical=7.dp),color=Muted,fontSize=7.sp,fontWeight=FontWeight.Bold) }
-                onDelete?.let { IconButton(onClick=it,modifier=Modifier.size(29.dp)){Icon(Icons.Default.Delete,"Delete",Red,Modifier.size(15.dp))} }
+                onDelete?.let { IconButton(onClick=it,modifier=Modifier.size(29.dp)){Icon(imageVector=Icons.Default.Delete,contentDescription="Delete",tint=Red,modifier=Modifier.size(15.dp))} }
             }
         }
     }
@@ -413,13 +413,13 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal=12.dp,vertical=7.dp)){
             Row(Modifier.fillMaxWidth().height(68.dp),verticalAlignment=Alignment.CenterVertically){
-                NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(Icons.AutoMirrored.Filled.ArrowBack,"Back",White,Modifier.padding(11.dp))}
+                NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(imageVector=Icons.AutoMirrored.Filled.ArrowBack,contentDescription="Back",tint=White,modifier=Modifier.padding(11.dp))}
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
                     Row(verticalAlignment=Alignment.CenterVertically){Text(text="Siya",color=White,fontSize=28.sp,fontWeight=FontWeight.Bold);Text(text=" Ai",color=Cyan,fontSize=28.sp,fontWeight=FontWeight.Bold)}
                     Text(text="Y O U R   A I   C O M P A N I O N",color=Muted,fontSize=7.sp,letterSpacing=2.2.sp)
                 }
-                NeonSurface(Modifier.size(48.dp).clickable{menu=true},Purple,15.dp){Icon(Icons.Default.Menu,"Menu",Purple,Modifier.padding(11.dp))}
+                NeonSurface(Modifier.size(48.dp).clickable{menu=true},Purple,15.dp){Icon(imageVector=Icons.Default.Menu,contentDescription="Menu",tint=Purple,modifier=Modifier.padding(11.dp))}
             }
             NeonDivider()
             LazyColumn(Modifier.weight(1f).fillMaxWidth(),contentPadding=PaddingValues(top=13.dp,bottom=13.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
@@ -428,11 +428,11 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
             }
             if(attached!=null){Surface(shape=RoundedCornerShape(10.dp),color=Panel2,border=BorderStroke(1.dp,Cyan.copy(.45f))){Text(text="📎 "+attached!!,modifier=Modifier.padding(7.dp),color=Cyan,fontSize=9.sp,maxLines=1)};Spacer(Modifier.height(5.dp))}
             Row(Modifier.fillMaxWidth().padding(bottom=5.dp),verticalAlignment=Alignment.Bottom){
-                NeonSurface(Modifier.size(48.dp).clickable{picker.launch(arrayOf("*/*"))},Purple,15.dp){Icon(Icons.Default.AttachFile,"Attach",White,Modifier.padding(12.dp))}
+                NeonSurface(Modifier.size(48.dp).clickable{picker.launch(arrayOf("*/*"))},Purple,15.dp){Icon(imageVector=Icons.Default.AttachFile,contentDescription="Attach",tint=White,modifier=Modifier.padding(12.dp))}
                 Spacer(Modifier.width(7.dp))
                 OutlinedTextField(value=input,onValueChange={input=it},modifier=Modifier.weight(1f),placeholder={Text("Type your message…",color=Muted)},shape=RoundedCornerShape(18.dp),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Text),colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=Purple,unfocusedBorderColor=Panel2,focusedTextColor=White,unfocusedTextColor=White,cursorColor=Cyan),maxLines=4)
                 Spacer(Modifier.width(5.dp))
-                NeonSurface(Modifier.size(48.dp),Blue,15.dp){Icon(Icons.Default.Mic,"Voice",White,Modifier.padding(12.dp))}
+                NeonSurface(Modifier.size(48.dp),Blue,15.dp){Icon(imageVector=Icons.Default.Mic,contentDescription="Voice",tint=White,modifier=Modifier.padding(12.dp))}
                 Spacer(Modifier.width(5.dp))
                 NeonSurface(Modifier.size(53.dp).clickable(enabled=input.isNotBlank()&&!busy){
                     val prompt=input.trim();input="";messages+=true to prompt;busy=true
@@ -441,7 +441,7 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
                         catch(e:Exception){messages+=false to "Local AI error: "+(e.message ?: "model unavailable")}
                         finally{busy=false}
                     }
-                },Purple,17.dp){Icon(Icons.Default.Send,"Send",White,Modifier.padding(14.dp))}
+                },Purple,17.dp){Icon(imageVector=Icons.Default.Send,contentDescription="Send",tint=White,modifier=Modifier.padding(14.dp))}
             }
         }
         if(menu)Box(Modifier.fillMaxSize().background(Color.Black.copy(.42f)).clickable{menu=false}){
@@ -458,7 +458,7 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
 @Composable
 private fun MenuItem(text:String,icon:androidx.compose.ui.graphics.vector.ImageVector,onClick:()->Unit){
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick=onClick).padding(11.dp),verticalAlignment=Alignment.CenterVertically){
-        Icon(icon,null,Cyan,Modifier.size(20.dp));Spacer(Modifier.width(9.dp));Text(text=text,color=White,fontSize=11.sp)
+        Icon(imageVector=icon,contentDescription=null,tint=Cyan,modifier=Modifier.size(20.dp));Spacer(Modifier.width(9.dp));Text(text=text,color=White,fontSize=11.sp)
     }
 }
 
@@ -496,7 +496,7 @@ private fun NeonAvatar(){
 @Composable
 private fun NeonHeader(title:String,subtitle:String,onBack:()->Unit,icon:androidx.compose.ui.graphics.vector.ImageVector,accent:Color){
     Row(Modifier.fillMaxWidth().height(66.dp),verticalAlignment=Alignment.CenterVertically){
-        NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(Icons.AutoMirrored.Filled.ArrowBack,"Back",White,Modifier.padding(10.dp))}
+        NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(imageVector=Icons.AutoMirrored.Filled.ArrowBack,contentDescription="Back",tint=White,modifier=Modifier.padding(10.dp))}
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)){Text(text=title,color=White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text(text=subtitle,color=Muted,fontSize=11.sp)}
         NeonSurface(Modifier.size(48.dp),accent,15.dp){Icon(imageVector=icon,contentDescription=null,tint=accent,modifier=Modifier.padding(11.dp))}
