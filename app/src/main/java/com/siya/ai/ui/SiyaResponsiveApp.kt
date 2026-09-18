@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.graphics.Paint as AndroidPaint
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -18,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,6 +62,8 @@ import com.siya.ai.vad.VadModelStore
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.sin
 
 private val Bg = Color(0xFF020611)
 private val Deep = Color(0xFF030A17)
@@ -182,43 +186,229 @@ private fun ReferenceSideText(lines: List<String>, alignment: Alignment.Horizont
 
 @Composable
 private fun ReferenceHologram(active: Boolean, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "reference-hologram")
-    val phase by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(if (active) 1500 else 4800, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "phase")
-    val breathe by transition.animateFloat(.96f, 1.045f, infiniteRepeatable(tween(if (active) 850 else 1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
+    val transition = rememberInfiniteTransition(label = "siya-orbit-system")
+    val radar by transition.animateFloat(
+        0f, 360f,
+        infiniteRepeatable(
+            tween(if (active) 1050 else 4200, easing = FastOutSlowInEasing),
+            RepeatMode.Restart
+        ),
+        label = "radar"
+    )
+    val pulse by transition.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(
+            tween(if (active) 900 else 1900, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse
+        ),
+        label = "orb-pulse"
+    )
+    val orbit by transition.animateFloat(
+        0f, 360f,
+        infiniteRepeatable(
+            tween(if (active) 2600 else 6200, easing = FastOutSlowInEasing),
+            RepeatMode.Restart
+        ),
+        label = "orbit"
+    )
+
     Canvas(modifier) {
-        val w = size.width; val h = size.height; val cx = w * .50f; val cy = h * .46f
-        val r = minOf(w, h) * .235f * breathe; val stroke = 1.dp.toPx()
-        drawCircle(Brush.radialGradient(listOf(Cyan.copy(if (active) .25f else .18f), Blue.copy(.10f), Purple.copy(.09f), Color.Transparent), Offset(cx, cy), r * 2.35f), r * 2.35f, Offset(cx, cy))
-        drawLine(Cyan.copy(.18f), Offset(cx, cy-r*2.25f), Offset(cx, cy+r*2.25f), stroke)
-        drawLine(Cyan.copy(.16f), Offset(cx-r*2.25f, cy), Offset(cx+r*2.25f, cy), stroke)
-        listOf(1.28f, 1.55f, 1.82f).forEachIndexed { i, s -> drawCircle(if (i == 1) Purple.copy(.24f) else Cyan.copy(.18f), r*s, Offset(cx,cy), style=Stroke((if(i==1) 1.5f else 1f).dp.toPx())) }
-        val sweep = phase * 360f
-        drawArc(Cyan.copy(.92f), sweep, 112f, false, Offset(cx-r*1.82f,cy-r*1.82f), androidx.compose.ui.geometry.Size(r*3.64f,r*3.64f), style=Stroke(3.6.dp.toPx(),cap=StrokeCap.Round))
-        drawArc(Purple.copy(.88f), sweep+150f, 96f, false, Offset(cx-r*1.96f,cy-r*1.96f), androidx.compose.ui.geometry.Size(r*3.92f,r*3.92f), style=Stroke(3.dp.toPx(),cap=StrokeCap.Round))
-        drawArc(Blue.copy(.62f), sweep+285f, 54f, false, Offset(cx-r*2.08f,cy-r*2.08f), androidx.compose.ui.geometry.Size(r*4.16f,r*4.16f), style=Stroke(1.6.dp.toPx(),cap=StrokeCap.Round))
-        drawCircle(Brush.radialGradient(listOf(White.copy(.20f), Cyan.copy(.17f), Blue.copy(.11f), Purple.copy(.10f), Color.Transparent), Offset(cx-r*.10f,cy-r*.13f), r*1.06f), r*1.06f, Offset(cx,cy))
-        drawCircle(Cyan.copy(.28f),r*1.00f,Offset(cx,cy),style=Stroke(1.2.dp.toPx()))
-        drawCircle(White.copy(.15f),r*.78f,Offset(cx,cy),style=Stroke(1.dp.toPx()))
-        listOf(.56f,.46f,.38f,.32f).forEachIndexed { i, oh ->
-            val ow = listOf(2.05f,1.92f,1.70f,1.50f)[i]
-            drawOval(Brush.horizontalGradient(listOf(Color.Transparent, if(i%2==0) Cyan.copy(.76f) else Purple.copy(.70f), Color.Transparent)), Offset(cx-r*ow/2f,cy-r*oh/2f), androidx.compose.ui.geometry.Size(r*ow,r*oh), style=Stroke((if(i<2) 2f else 1f).dp.toPx()))
+        val w = size.width
+        val h = size.height
+        val cx = w * .5f
+        val cy = h * .46f
+        val base = minOf(w, h) * .205f
+        val breathe = 1f + pulse * .055f
+        val r = base * breathe
+        val thin = 1.dp.toPx()
+
+        // Deep holographic aura.
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(
+                    Cyan.copy(.16f + pulse * .08f),
+                    Blue.copy(.10f),
+                    Purple.copy(.09f),
+                    Color.Transparent
+                ),
+                Offset(cx, cy),
+                r * 3.15f
+            ),
+            radius = r * 3.15f,
+            center = Offset(cx, cy)
+        )
+
+        // Radar grid / crosshair.
+        drawLine(Cyan.copy(.15f), Offset(cx, cy - r * 3.0f), Offset(cx, cy + r * 3.0f), thin)
+        drawLine(Cyan.copy(.13f), Offset(cx - r * 3.0f, cy), Offset(cx + r * 3.0f, cy), thin)
+        drawLine(Purple.copy(.10f), Offset(cx - r * 2.25f, cy - r * 2.25f), Offset(cx + r * 2.25f, cy + r * 2.25f), thin)
+        drawLine(Purple.copy(.10f), Offset(cx + r * 2.25f, cy - r * 2.25f), Offset(cx - r * 2.25f, cy + r * 2.25f), thin)
+
+        // Concentric orbit rings.
+        listOf(1.25f, 1.52f, 1.82f, 2.12f).forEachIndexed { index, scale ->
+            drawCircle(
+                color = if (index % 2 == 0) Cyan.copy(.22f) else Purple.copy(.19f),
+                radius = r * scale,
+                center = Offset(cx, cy),
+                style = Stroke(if (index == 2) 1.8.dp.toPx() else thin)
+            )
         }
-        repeat(9) { i ->
-            val a=(i/9f)*6.28318f+phase*6.28318f*(if(i%2==0) 1f else -.65f)
-            val rx=r*(.78f+(i%3)*.23f); val ry=r*(.33f+(i%2)*.15f)
-            drawCircle(if(i%3==0) Purple.copy(.95f) else Cyan.copy(.9f), if(i%4==0) 3.dp.toPx() else 1.5.dp.toPx(), Offset(cx+kotlin.math.cos(a)*rx,cy+kotlin.math.sin(a)*ry))
+
+        // High-intensity neon arcs. A soft under-stroke + bright core gives the
+        // glow while remaining GPU-safe on Android hardware.
+        fun neonArc(color: Color, radius: Float, start: Float, sweep: Float, width: Float) {
+            drawArc(
+                color.copy(.20f),
+                startAngle = start,
+                sweepAngle = sweep,
+                useCenter = false,
+                topLeft = Offset(cx - radius, cy - radius),
+                size = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f),
+                style = Stroke(width + 8.dp.toPx(), cap = StrokeCap.Round)
+            )
+            drawArc(
+                color.copy(.90f),
+                startAngle = start,
+                sweepAngle = sweep,
+                useCenter = false,
+                topLeft = Offset(cx - radius, cy - radius),
+                size = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f),
+                style = Stroke(width, cap = StrokeCap.Round)
+            )
         }
-        repeat(48) { i ->
-            val a=i/48f*6.28318f; val inner=r*1.88f; val outer=inner+if(i%4==0) r*.10f else r*.045f
-            drawLine(if(i%4==0) Cyan.copy(.55f) else Muted.copy(.23f), Offset(cx+kotlin.math.cos(a)*inner,cy+kotlin.math.sin(a)*inner), Offset(cx+kotlin.math.cos(a)*outer,cy+kotlin.math.sin(a)*outer), stroke)
+
+        neonArc(Cyan, r * 1.82f, radar, 92f, 3.dp.toPx())
+        neonArc(Purple, r * 1.82f, radar + 142f, 78f, 2.8.dp.toPx())
+        neonArc(Blue, r * 2.12f, radar + 248f, 52f, 2.dp.toPx())
+        neonArc(Pink, r * 1.52f, radar + 310f, 40f, 1.7.dp.toPx())
+
+        // Elliptical electron orbits.
+        listOf(
+            Triple(.58f, 2.15f, Cyan),
+            Triple(.43f, 1.90f, Purple),
+            Triple(.32f, 1.68f, Cyan)
+        ).forEachIndexed { index, (height, width, color) ->
+            drawOval(
+                brush = Brush.horizontalGradient(
+                    listOf(
+                        Color.Transparent,
+                        color.copy(.72f),
+                        White.copy(if (index == 0) .50f else .25f),
+                        color.copy(.60f),
+                        Color.Transparent
+                    )
+                ),
+                topLeft = Offset(cx - r * width / 2f, cy - r * height / 2f),
+                size = androidx.compose.ui.geometry.Size(r * width, r * height),
+                style = Stroke(if (index == 0) 2.dp.toPx() else thin)
+            )
         }
-        val beamX=cx+(phase-.5f)*r*1.15f
-        drawLine(Cyan.copy(.22f),Offset(beamX,cy-r*2.18f),Offset(beamX,cy+r*2.18f),stroke)
-        repeat(22) { i -> val a=i/22f*6.28318f+phase*6.28318f*.35f; val rr=r*(1.35f+(i%5)*.16f); drawCircle(if(i%4==0) Purple.copy(.9f) else Cyan.copy(.72f),if(i%7==0) 2.4.dp.toPx() else 1.dp.toPx(),Offset(cx+kotlin.math.cos(a)*rr,cy+kotlin.math.sin(a)*rr)) }
-        drawCircle(Cyan.copy(.18f),r*.22f,Offset(cx,cy)); drawCircle(White.copy(.98f),r*.075f,Offset(cx,cy)); drawCircle(Cyan.copy(.95f),r*.13f,Offset(cx,cy),style=Stroke(2.dp.toPx()))
-        val py=cy+r*1.92f
-        drawOval(Brush.horizontalGradient(listOf(Color.Transparent,Purple.copy(.48f),Cyan.copy(.72f),Purple.copy(.48f),Color.Transparent)),Offset(cx-r*1.70f,py-r*.08f),androidx.compose.ui.geometry.Size(r*3.40f,r*.16f),style=Stroke(1.5.dp.toPx()))
-        drawOval(Brush.horizontalGradient(listOf(Color.Transparent,Cyan.copy(.34f),Purple.copy(.30f),Color.Transparent)),Offset(cx-r*1.42f,py),androidx.compose.ui.geometry.Size(r*2.84f,r*.07f),style=Stroke(1.dp.toPx()))
+
+        // Moving particles on orbital paths.
+        repeat(18) { i ->
+            val angle = orbit + i * 20f
+            val radians = Math.toRadians(angle.toDouble())
+            val rx = r * (1.35f + (i % 4) * .22f)
+            val ry = r * (.45f + (i % 3) * .13f)
+            val x = cx + cos(radians).toFloat() * rx
+            val y = cy + sin(radians).toFloat() * ry
+            val dot = if (i % 4 == 0) 3.2.dp.toPx() else 1.4.dp.toPx()
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(White.copy(.98f), if (i % 2 == 0) Cyan else Purple, Color.Transparent),
+                    Offset(x, y),
+                    dot * 4f
+                ),
+                radius = dot * 4f,
+                center = Offset(x, y)
+            )
+            drawCircle(if (i % 2 == 0) Cyan.copy(.95f) else Purple.copy(.95f), dot, Offset(x, y))
+        }
+
+        // Outer radar ticks.
+        repeat(64) { i ->
+            val a = Math.toRadians((i * 5.625).toDouble())
+            val inner = r * 2.30f
+            val outer = inner + if (i % 8 == 0) r * .11f else r * .045f
+            val color = if (i % 8 == 0) Cyan.copy(.62f) else Muted.copy(.25f)
+            drawLine(
+                color,
+                Offset(cx + cos(a).toFloat() * inner, cy + sin(a).toFloat() * inner),
+                Offset(cx + cos(a).toFloat() * outer, cy + sin(a).toFloat() * outer),
+                if (i % 8 == 0) 1.5.dp.toPx() else .7.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+
+        // Radar sweep line.
+        val sweepRad = Math.toRadians(radar.toDouble())
+        val sweepX = cx + cos(sweepRad).toFloat() * r * 2.35f
+        val sweepY = cy + sin(sweepRad).toFloat() * r * 2.35f
+        drawLine(
+            Cyan.copy(.30f),
+            Offset(cx, cy),
+            Offset(sweepX, sweepY),
+            1.dp.toPx()
+        )
+        drawCircle(Cyan.copy(.18f), r * 2.35f, Offset(sweepX, sweepY))
+
+        // Central orb: layered radial illumination + neon rings.
+        val orbRadius = r * .82f
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(
+                    White.copy(.98f),
+                    Cyan.copy(.78f),
+                    Blue.copy(.48f),
+                    Purple.copy(.38f),
+                    Color.Transparent
+                ),
+                Offset(cx - r * .12f, cy - r * .15f),
+                orbRadius * 1.55f
+            ),
+            radius = orbRadius * 1.55f,
+            center = Offset(cx, cy)
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(
+                    White.copy(.94f),
+                    Cyan.copy(.70f),
+                    Blue.copy(.36f),
+                    Purple.copy(.22f),
+                    Color.Transparent
+                ),
+                Offset(cx - r * .18f, cy - r * .18f),
+                orbRadius
+            ),
+            radius = orbRadius,
+            center = Offset(cx, cy)
+        )
+        drawCircle(Cyan.copy(.70f), orbRadius, Offset(cx, cy), style = Stroke(2.2.dp.toPx()))
+        drawCircle(Purple.copy(.62f), orbRadius * .88f, Offset(cx, cy), style = Stroke(1.2.dp.toPx()))
+        drawCircle(Cyan.copy(.22f + pulse * .18f), orbRadius * 1.18f, Offset(cx, cy), style = Stroke(1.dp.toPx()))
+
+        // Bright AI core.
+        drawCircle(
+            brush = Brush.radialGradient(listOf(White, Cyan.copy(.85f), Color.Transparent), Offset(cx, cy), r * .30f),
+            radius = r * .30f,
+            center = Offset(cx, cy)
+        )
+        drawCircle(White.copy(.98f), r * (.055f + pulse * .018f), Offset(cx, cy))
+
+        // Native shadow layer adds an additional high-intensity neon halo.
+        drawIntoCanvas { canvas ->
+            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                style = AndroidPaint.Style.STROKE
+                strokeWidth = 2.dp.toPx()
+                color = Cyan.value.toInt()
+                setShadowLayer(18.dp.toPx(), 0f, 0f, Cyan.value.toInt())
+            }
+            canvas.nativeCanvas.drawCircle(cx, cy, orbRadius * 1.03f, paint)
+            paint.color = Purple.value.toInt()
+            paint.setShadowLayer(22.dp.toPx(), 0f, 0f, Purple.value.toInt())
+            canvas.nativeCanvas.drawCircle(cx, cy, orbRadius * 1.13f, paint)
+        }
     }
 }
 
