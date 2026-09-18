@@ -89,7 +89,10 @@ class AudioInput(
     }
 
     private fun createRecorder(bufferBytes: Int): AudioRecord? {
+        // Prefer communication capture so Android can apply the device's
+        // acoustic echo-cancellation path while Siya is speaking.
         val sources = intArrayOf(
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
             MediaRecorder.AudioSource.VOICE_RECOGNITION,
             MediaRecorder.AudioSource.MIC
         )
