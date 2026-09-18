@@ -11,6 +11,8 @@ class VadPart3Test {
         assertEquals(16_000, config.sampleRate)
         assertEquals(512, config.windowSamples)
         assertEquals(64, config.contextSamples)
+        assertEquals(650L, config.minSilenceDurationMs)
+        assertEquals(0.45f, config.threshold)
     }
 
     @Test fun speechStartsAfterMinimumSpeechDuration() {
@@ -28,6 +30,19 @@ class VadPart3Test {
         assertNull(machine.accept(0.1f, 512).event)
         assertEquals(VadEventType.SPEECH_END, machine.accept(0.1f, 512).event?.type)
         assertEquals(VadState.IDLE, machine.state())
+    }
+
+
+    @Test
+    fun defaultConfigDoesNotEndSpeechDuringShortPause() {
+        val machine = SpeechStateMachine(VadConfig(minSpeechDurationMs = 0))
+        assertEquals(VadEventType.SPEECH_START, machine.accept(0.9f).event?.type)
+
+        // 4 x 512 samples = 128 ms pause: this must remain one utterance.
+        repeat(4) {
+            assertNull(machine.accept(0.05f, 512).event)
+        }
+        assertEquals(VadState.ENDING, machine.state())
     }
 
     @Test fun resetReturnsToIdle() {
