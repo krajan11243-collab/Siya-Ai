@@ -561,7 +561,7 @@ private fun PixelChat(onBack:()->Unit,onModels:()->Unit) {
 }
 
 @Composable
-private fun BasicChatField(value:String,onValueChange:(String)->Unit){
+private fun RowScope.BasicChatField(value:String,onValueChange:(String)->Unit){
     androidx.compose.foundation.text.BasicTextField(
         value=value,onValueChange=onValueChange,
         modifier=Modifier.weight(1f).padding(horizontal=4.dp,vertical=7.dp),
