@@ -27,4 +27,17 @@ class SpeechSegmentBufferTest {
         assertEquals(0, buffer.finish().size)
         assertTrue(!buffer.isActive())
     }
+    @Test
+    fun speechStartKeepsPreRollUntilFinish() {
+        val buffer = SpeechSegmentBuffer(preRollMs = 10)
+        buffer.append(ShortArray(160) { 7 })
+        buffer.start()
+        buffer.append(ShortArray(160) { 9 })
+        val result = buffer.finish()
+        assertEquals(320, result.size)
+        assertEquals(7.toShort(), result.first())
+        assertEquals(9.toShort(), result.last())
+    }
+
 }
+
