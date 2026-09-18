@@ -22,10 +22,10 @@ class AudioEngine(
     fun start(): Boolean {
         if (running.get()) return true
         if (!focus.request()) return false
-        if (!output.initialize()) {
-            focus.abandon()
-            return false
-        }
+        // Voice input must not depend on speaker-output initialization.
+        // TTS owns its own playback path; requiring AudioTrack here can make
+        // a valid microphone unusable on some devices/routes.
+        output.initialize()
         val started = input.start(Pcm16Listener { pcm, length, _ ->
             var sum = 0.0
             var peak = 0
