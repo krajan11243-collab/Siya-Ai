@@ -490,18 +490,18 @@ private fun NeonHeader(title:String,subtitle:String,onBack:()->Unit,icon:android
         NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(Icons.AutoMirrored.Filled.ArrowBack,"Back",White,Modifier.padding(10.dp))}
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)){Text(title,White,25.sp,FontWeight.ExtraBold);Text(subtitle,Muted,11.sp)}
-        NeonSurface(Modifier.size(48.dp),accent,15.dp){Icon(icon,null,accent,Modifier.padding(11.dp))}
+        NeonSurface(Modifier.size(48.dp),accent,15.dp){Icon(imageVector=icon,contentDescription=null,tint=accent,modifier=Modifier.padding(11.dp))}
     }
 }
 
 @Composable
 private fun NeonIconBox(icon:androidx.compose.ui.graphics.vector.ImageVector,accent:Color,size:androidx.compose.ui.unit.Dp){
-    NeonSurface(Modifier.size(size),accent,16.dp){Icon(icon,null,accent,Modifier.padding(size/4))}
+    NeonSurface(Modifier.size(size),accent,16.dp){Icon(imageVector=icon,contentDescription=null,tint=accent,modifier=Modifier.padding(size/4))}
 }
 
 @Composable
 private fun NeonArrow(accent:Color){
-    NeonSurface(Modifier.size(49.dp),accent,50.dp){Icon(Icons.Default.ChevronRight,null,White,Modifier.padding(9.dp))}
+    NeonSurface(Modifier.size(49.dp),accent,50.dp){Icon(imageVector=Icons.Default.ChevronRight,contentDescription=null,tint=White,modifier=Modifier.padding(9.dp))}
 }
 
 @Composable
