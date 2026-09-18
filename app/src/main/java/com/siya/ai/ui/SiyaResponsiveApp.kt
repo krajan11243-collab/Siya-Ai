@@ -255,6 +255,30 @@ private fun ReferenceMicButton(active:Boolean, enabled:Boolean, onClick:()->Unit
     }
 }
 @Composable
+private fun HomeHeaderButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        NeonSurface(
+            Modifier.size(58.dp).clip(RoundedCornerShape(18.dp)).clickable(onClick = onClick),
+            accent, 18.dp
+        ) {
+            Icon(icon, label, tint = accent, modifier = Modifier.padding(14.dp))
+        }
+        Text(
+            text = label,
+            modifier = Modifier.padding(top = 4.dp),
+            color = Muted,
+            fontSize = 7.sp,
+            letterSpacing = 2.sp
+        )
+    }
+}
+
+@Composable
 private fun ModelHome(onBack: () -> Unit, onAllModels: () -> Unit, onSpeech: () -> Unit, onImport: () -> Unit) {
     var showRequirements by rememberSaveable { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
