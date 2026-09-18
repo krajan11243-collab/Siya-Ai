@@ -125,14 +125,18 @@ class SiyaVoiceService : Service() {
                         VoiceSessionState.speaking(answer.text)
                         updateNotification("Siya is speaking")
                     } else {
-                        VoiceSessionState.error("Siya returned an empty response")
-                        updateNotification("Siya returned empty text")
+                        val recovery = "माफ़ कीजिए, मैं अभी जवाब नहीं बना पाई। कृपया फिर से बोलिए।"
+                        tts?.speak(recovery)
+                        VoiceSessionState.speaking(recovery)
+                        updateNotification("Empty local AI response • recovery spoken")
                     }
                 }.onFailure { error ->
                     cancelTurnTimeout()
                     tts?.stop()
+                    val recovery = "माफ़ कीजिए, लोकल AI में अभी समस्या आई है। कृपया दोबारा बोलिए।"
+                    tts?.speak(recovery)
                     VoiceSessionState.error(error.message ?: "Local AI error")
-                    updateNotification("Local AI error")
+                    updateNotification("Local AI error • recovery spoken")
                 }
             }
         }.onFailure {
@@ -167,8 +171,10 @@ class SiyaVoiceService : Service() {
     private fun handleTranscript(transcript: String) {
         if (transcript.isBlank()) {
             cancelTurnTimeout()
-            VoiceSessionState.error("I could not understand the speech")
-            updateNotification("Speech was not understood")
+            val recovery = "मैं आपकी बात साफ़ नहीं सुन पाई। कृपया फिर से बोलिए।"
+            VoiceSessionState.speaking(recovery)
+            tts?.speak(recovery)
+            updateNotification("Speech was not understood • listening again")
             return
         }
         val normalized = transcript.trim().lowercase()
