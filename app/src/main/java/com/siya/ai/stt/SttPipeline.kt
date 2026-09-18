@@ -36,9 +36,14 @@ class SttPipeline(
         }
     }
 
-    fun reset() {
-        pending?.cancel(false)
+    /** Cancel an already-finished ASR job while preserving the current live utterance. */
+    fun cancelPending() {
+        pending?.cancel(true)
         pending = null
+    }
+
+    fun reset() {
+        cancelPending()
         segment.reset()
     }
 
