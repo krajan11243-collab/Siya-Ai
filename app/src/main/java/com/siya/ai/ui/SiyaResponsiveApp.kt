@@ -113,7 +113,7 @@ fun SiyaResponsiveApp(
                     onRequestPermissions = onRequestPermissions,
                     onVoice = {
                         if (!microphoneGranted) onRequestPermissions()
-                        else if (voice.active) onStopVoice() else onStartVoice()
+                        else if (voice.phase == VoiceSessionState.Phase.ERROR || !voice.active) onStartVoice() else onStopVoice()
                     }
                         )
                     }
@@ -164,8 +164,6 @@ private fun PixelHome(
                     ReferenceSideText(listOf("SIMPLE", "NATURAL", "POWERFUL", "IN YOUR LANGUAGE"), Alignment.End, Modifier.align(Alignment.End).padding(end = 2.dp, bottom = 3.dp))
                 }
             }
-            Text("Tap to speak", Modifier.fillMaxWidth().padding(top = 1.dp), color = Muted, fontSize = 17.sp, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(1.dp))
             ReferenceMicButton(active = voice.active, enabled = microphoneGranted, onClick = onVoice)
             Text(if (!microphoneGranted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak",
                 Modifier.fillMaxWidth().padding(top = 0.dp), color = Muted, fontSize = 9.sp, textAlign = TextAlign.Center)
@@ -245,13 +243,15 @@ private fun ReferenceHomeBackground() {
 private fun ReferenceMicButton(active:Boolean, enabled:Boolean, onClick:()->Unit) {
     val t=rememberInfiniteTransition(label="reference-mic")
     val pulse by t.animateFloat(1f,1.08f,infiniteRepeatable(tween(if(active)600 else 1400),RepeatMode.Reverse),label="pulse")
-    Box(Modifier.fillMaxWidth().height(112.dp).clickable(enabled=enabled,onClick=onClick),contentAlignment=Alignment.Center){
+    Box(Modifier.fillMaxWidth().height(112.dp),contentAlignment=Alignment.Center){
         Canvas(Modifier.fillMaxSize()){
             val cx=size.width/2f; val cy=size.height*.50f; val r=38.dp.toPx()*pulse
             repeat(13){i->val x=cx-145.dp.toPx()+i*11.dp.toPx();val amp=(10+((i*7)%18)).dp.toPx();val alpha=if(enabled).55f else .18f;drawLine(Cyan.copy(alpha),Offset(x,cy-amp),Offset(x,cy+amp),1.dp.toPx(),cap=StrokeCap.Round);val xr=cx+145.dp.toPx()-i*11.dp.toPx();drawLine(Purple.copy(alpha),Offset(xr,cy-amp*.8f),Offset(xr,cy+amp*.8f),1.dp.toPx(),cap=StrokeCap.Round)}
             drawCircle(Brush.radialGradient(listOf(Cyan.copy(.25f),Purple.copy(.13f),Color.Transparent),Offset(cx,cy),r*2.1f),r*2.1f,Offset(cx,cy));drawCircle(Panel2,r,Offset(cx,cy));drawCircle(Cyan.copy(.95f),r,Offset(cx,cy),style=Stroke(2.8.dp.toPx()));drawCircle(Purple.copy(.92f),r*.88f,Offset(cx,cy),style=Stroke(1.8.dp.toPx()));drawCircle(Blue.copy(.72f),r*.76f,Offset(cx,cy),style=Stroke(1.dp.toPx()))
         }
-        Icon(if(active)Icons.Default.Stop else Icons.Default.Mic,"Microphone",tint=White.copy(if(enabled)1f else .45f),modifier=Modifier.size(39.dp))
+        Box(Modifier.size(88.dp).clickable(enabled=enabled,onClick=onClick),contentAlignment=Alignment.Center){
+            Icon(if(active)Icons.Default.Stop else Icons.Default.Mic,"Microphone",tint=White.copy(if(enabled)1f else .45f),modifier=Modifier.size(39.dp))
+        }
     }
 }
 @Composable
