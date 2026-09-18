@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -402,11 +403,11 @@ private fun ReferenceHologram(active: Boolean, modifier: Modifier = Modifier) {
                 style = AndroidPaint.Style.STROKE
                 strokeWidth = 2.dp.toPx()
                 color = Cyan.value.toInt()
-                setShadowLayer(18.dp.toPx(), 0f, 0f, Cyan.value.toInt())
+                setShadowLayer(18.dp.toPx(), 0f, 0f, Cyan.toArgb())
             }
             canvas.nativeCanvas.drawCircle(cx, cy, orbRadius * 1.03f, paint)
-            paint.color = Purple.value.toInt()
-            paint.setShadowLayer(22.dp.toPx(), 0f, 0f, Purple.value.toInt())
+            paint.color = Purple.toArgb()
+            paint.setShadowLayer(22.dp.toPx(), 0f, 0f, Purple.toArgb())
             canvas.nativeCanvas.drawCircle(cx, cy, orbRadius * 1.13f, paint)
         }
     }
