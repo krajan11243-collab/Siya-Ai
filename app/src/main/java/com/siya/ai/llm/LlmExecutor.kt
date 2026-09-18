@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-/** Single-turn local LLM executor with streaming tokens and hard turn invalidation. */
+/** Single-turn local LLM executor with streaming tokens and safe background model warm-up. */
 class LlmExecutor(
     private val engineFactory: () -> LocalLlmEngine,
     private val onResult: (Result<LlmResult>) -> Unit,
@@ -23,40 +23,51 @@ class LlmExecutor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
     private var engine: LocalLlmEngine? = null
     @Volatile private var currentJob: Job? = null
+    @Volatile private var warmupJob: Job? = null
 
+    /**
+     * Loads the GGUF model in the background without being cancelled when the user
+     * starts a turn. This avoids restarting a 1+ GB model load at the exact moment
+     * the first voice request arrives.
+     */
     fun warmUp() {
-        if (closed.get()) return
-        currentJob?.cancel()
-        currentJob = scope.launch {
+        if (closed.get() || engine != null || warmupJob?.isActive == true) return
+        warmupJob = scope.launch {
             runCatching {
                 currentCoroutineContext().ensureActive()
-                val loaded = engine ?: engineFactory().also {
-                    it.load()
-                    engine = it
+                if (engine == null) engineFactory().also { it.load() }.let { loaded ->
+                    if (!closed.get()) engine = loaded else loaded.close()
                 }
-                loaded
             }
         }
     }
 
+    fun isModelLoaded(): Boolean = engine != null && !closed.get()
+
     fun submit(prompt: String, onToken: (String) -> Unit = {}) {
         if (closed.get() || prompt.isBlank()) return
         val myTurn = turnId.incrementAndGet()
+        // Cancel only an active inference. Never cancel model warm-up.
+        engine?.cancelGeneration()
         currentJob?.cancel()
         currentJob = scope.launch {
             val result = try {
+                currentCoroutineContext().ensureActive()
+                // If warm-up is still loading, wait for it rather than starting
+                // another native model load.
+                warmupJob?.join()
+                currentCoroutineContext().ensureActive()
+
                 val fast = LlmFastPath.answer(prompt)
                 if (fast != null) {
                     onToken(fast)
                     Result.success(LlmResult(text = fast, tokensPerSecond = Float.POSITIVE_INFINITY))
                 } else {
-                    runCatching {
-                        val loaded = engine ?: engineFactory().also {
-                            it.load()
-                            engine = it
-                        }
-                        loaded.stream(prompt, onToken = onToken)
+                    val loaded = engine ?: engineFactory().also {
+                        it.load()
+                        engine = it
                     }
+                    loaded.stream(prompt, onToken = onToken)
                 }
             } catch (cancelled: CancellationException) {
                 return@launch
@@ -81,7 +92,9 @@ class LlmExecutor(
             turnId.incrementAndGet()
             engine?.cancelGeneration()
             currentJob?.cancel()
+            warmupJob?.cancel()
             currentJob = null
+            warmupJob = null
             scope.cancel()
             engine?.close()
             engine = null
