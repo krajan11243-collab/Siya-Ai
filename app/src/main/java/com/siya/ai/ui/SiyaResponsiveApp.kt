@@ -346,23 +346,94 @@ private fun NeonMicButton(active: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun ModelHome(onBack: () -> Unit, onAllModels: () -> Unit, onSpeech: () -> Unit, onImport: () -> Unit) {
-    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 18.dp, vertical = 10.dp)) {
-        NeonHeader("AI Models", "Download, Select & Use On-Device Models", onBack, Icons.Default.PhoneAndroid, Green)
-        Spacer(Modifier.height(16.dp))
-        ModelHomeCard("AI All Model Download Select", "Download all required models for complete AI", "Choose and download AI models for offline use", Purple, Icons.Default.Memory, onAllModels)
-        Spacer(Modifier.height(14.dp))
-        ModelHomeCard("Download Speech Models", "Download VAD, STT and all related models", "(One Click)", Cyan, Icons.Default.GraphicEq, onSpeech)
-        Spacer(Modifier.height(14.dp))
-        ModelHomeCard("Import GGUF", "Select and import your own model file", "", Purple, Icons.Default.FolderOpen, onImport)
-        Spacer(Modifier.height(20.dp))
-        NeonSurface(Modifier.fillMaxWidth(), Blue, 16.dp) {
-            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(imageVector=Icons.Default.Info, contentDescription=null, tint=Cyan, modifier=Modifier.size(31.dp))
+    var showRequirements by rememberSaveable { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = 18.dp, vertical = 10.dp)
+        ) {
+            Row(Modifier.fillMaxWidth().height(66.dp), verticalAlignment = Alignment.CenterVertically) {
+                NeonSurface(Modifier.size(48.dp).clickable(onClick = onBack), Cyan, 15.dp) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = White, modifier = Modifier.padding(10.dp))
+                }
                 Spacer(Modifier.width(12.dp))
-                Text(text="Model downloads run in a foreground service and continue while Siya Ai is closed. Progress stays in the notification.", color=Muted, fontSize=12.sp)
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("AI", color = Purple, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Models", color = White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Text("Download, Select & Use On-Device Models", color = Muted, fontSize = 11.sp)
+                }
+                NeonSurface(Modifier.size(48.dp).clickable { showRequirements = true }, Green, 15.dp) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.PhoneAndroid, "Device requirements", tint = Green, modifier = Modifier.size(24.dp))
+                        Box(Modifier.size(7.dp).align(Alignment.TopEnd).offset((-7).dp, 7.dp).background(Green, CircleShape))
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            ModelHomeCard("AI All Model Download Select", "Download all required models for complete AI", "Choose and download AI models for offline use", Purple, Icons.Default.Memory, onAllModels)
+            Spacer(Modifier.height(14.dp))
+            ModelHomeCard("Download Speech Models", "Download VAD, STT and all related models", "(One Click)", Cyan, Icons.Default.GraphicEq, onSpeech)
+            Spacer(Modifier.height(14.dp))
+            ModelHomeCard("Import GGUF", "Select and import your own model file", "", Purple, Icons.Default.FolderOpen, onImport)
+            Spacer(Modifier.height(18.dp))
+            NeonSurface(Modifier.fillMaxWidth(), Blue, 16.dp) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, null, tint = Cyan, modifier = Modifier.size(31.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Model downloads run in a foreground service and continue while Siya Ai is closed. Progress stays in the notification.", color = Muted, fontSize = 12.sp)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+        }
+        if (showRequirements) {
+            AlertDialog(
+                onDismissRequest = { showRequirements = false },
+                containerColor = Deep, titleContentColor = White, textContentColor = Muted,
+                shape = RoundedCornerShape(24.dp),
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        NeonIconBox(Icons.Default.PhoneAndroid, Green, 46.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text("Mobile Requirements", color = White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Siya Ai • On-Device Runtime", color = Green, fontSize = 10.sp)
+                        }
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RequirementRow(Icons.Default.Android, "Android", "Android 11+ background microphone behavior is subject to OS, foreground-service and OEM policies.", Green)
+                        RequirementRow(Icons.Default.Memory, "RAM", "RAM, latency and battery values are targets; actual usage depends on the selected model and device.", Purple)
+                        RequirementRow(Icons.Default.Storage, "Model Storage", "~1.1 GB Q4 LLM + ~80 MB STT + ~2 MB VAD + ~180 MB TTS are the master-plan estimates; exact size varies by build.", Cyan)
+                        RequirementRow(Icons.Default.WifiOff, "Offline", "Core conversation is designed to work without internet after required models are installed.", Blue)
+                        RequirementRow(Icons.Default.GraphicEq, "Audio", "AEC/Noise Suppression are device-dependent; headset/Bluetooth and noisy-room behavior require real-device testing.", Pink)
+                        RequirementRow(Icons.Default.BatteryChargingFull, "Battery", "Background operation follows Android service rules; battery behavior must be measured on the real device.", Green)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showRequirements = false }) {
+                        Text("CLOSE", color = Green, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RequirementRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String, accent: Color) {
+    NeonSurface(Modifier.fillMaxWidth(), accent, 13.dp) {
+        Row(Modifier.padding(9.dp), verticalAlignment = Alignment.Top) {
+            Icon(icon, null, tint = accent, modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(detail, color = Muted, fontSize = 9.sp, lineHeight = 12.sp, modifier = Modifier.padding(top = 2.dp))
             }
         }
-        Spacer(Modifier.weight(1f))
     }
 }
 
