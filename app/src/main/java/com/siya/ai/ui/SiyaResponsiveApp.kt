@@ -143,12 +143,12 @@ private fun ResponsiveHome(
                 Modifier.fillMaxWidth().padding(top = 7.dp),
                 RoundedCornerShape(14.dp), Panel,
                 border = BorderStroke(1.dp, Cyan.copy(.22f))
-            ) { Text(voice.response, Modifier.padding(horizontal = 13.dp, vertical = 9.dp), Color.White, 12.sp, maxLines = 2) }
+            ) { Text(text = voice.response, modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp), color = Color.White, fontSize = 12.sp, maxLines = 2) }
         } else if (voice.error != null) {
-            Text(voice.error!!, Modifier.fillMaxWidth().padding(top = 7.dp), Color(0xFFFF7187), 11.sp, textAlign = TextAlign.Center, maxLines = 2)
+            Text(text = voice.error!!, modifier = Modifier.fillMaxWidth().padding(top = 7.dp), color = Color(0xFFFF7187), fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 2)
         }
 
-        Text("Hindi  •  Hinglish  •  English", Modifier.fillMaxWidth().padding(top = 5.dp), Muted, 12.sp, textAlign = TextAlign.Center)
+        Text(text = "Hindi  •  Hinglish  •  English", modifier = Modifier.fillMaxWidth().padding(top = 5.dp), color = Muted, fontSize = 12.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(9.dp))
 
         Surface(
@@ -157,13 +157,13 @@ private fun ResponsiveHome(
             color = if (voice.active) Purple.copy(.25f) else Panel2,
             border = BorderStroke(2.dp, if (voice.active) Cyan else Purple)
         ) {
-            Icon(if (voice.active) Icons.Default.Stop else Icons.Default.Mic, "Microphone", tint = Color.White, modifier = Modifier.padding(25.dp))
+            Icon(imageVector = if (voice.active) Icons.Default.Stop else Icons.Default.Mic, contentDescription = "Microphone", tint = Color.White, modifier = Modifier.padding(25.dp))
         }
         Text(
             if (!microphoneGranted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak",
             Modifier.fillMaxWidth().padding(top = 4.dp), Muted, 10.sp, textAlign = TextAlign.Center
         )
-        Text("—   A L W A Y S   W I T H   Y O U   —", Modifier.fillMaxWidth().padding(top = 7.dp), Blue, 7.sp, letterSpacing = 2.1.sp, textAlign = TextAlign.Center)
+        Text(text = "—   A L W A Y S   W I T H   Y O U   —", modifier = Modifier.fillMaxWidth().padding(top = 7.dp), color = Blue, fontSize = 7.sp, letterSpacing = 2.1.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -173,7 +173,7 @@ private fun HeaderButton(icon: androidx.compose.ui.graphics.vector.ImageVector, 
         Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).clickable(onClick = onClick),
         RoundedCornerShape(15.dp), Panel,
         border = BorderStroke(1.dp, accent.copy(.7f))
-    ) { Icon(icon, label, tint = accent, modifier = Modifier.padding(11.dp)) }
+    ) { Icon(imageVector = icon, contentDescription = label, tint = accent, modifier = Modifier.padding(11.dp)) }
 }
 
 @Composable
@@ -202,23 +202,23 @@ private fun ResponsiveChat(onBack: () -> Unit, onModels: () -> Unit) {
         Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
             Column(Modifier.weight(1f)) {
-                Text("Siya Chat", Color.White, 22.sp, FontWeight.Bold)
-                Text(if (installed) "Qwen 2.5 1.5B • Offline" else "Local model not installed", if (installed) Cyan else Muted, 10.sp)
+                Text(text = "Siya Chat", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(text = if (installed) "Qwen 2.5 1.5B • Offline" else "Local model not installed", color = if (installed) Cyan else Muted, fontSize = 10.sp)
             }
             Surface(Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onModels), RoundedCornerShape(12.dp), Panel, border = BorderStroke(1.dp, Blue.copy(.65f))) {
-                Text("MODEL", Modifier.padding(horizontal = 10.dp, vertical = 9.dp), Cyan, 9.sp, FontWeight.Bold)
+                Text(text = "MODEL", modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp), color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (messages.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(top = 35.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.AutoAwesome, null, Cyan, Modifier.size(42.dp)); Spacer(Modifier.height(10.dp)); Text("Talk to Siya", Color.White, 18.sp, FontWeight.Bold); Text("Private offline conversation", Muted, 11.sp)
+                    Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = Cyan, modifier = Modifier.size(42.dp)); Spacer(Modifier.height(10.dp)); Text(text = "Talk to Siya", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold); Text(text = "Private offline conversation", color = Muted, fontSize = 11.sp)
                 }
             }
             items(messages) { message ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.first) Arrangement.End else Arrangement.Start) {
                     Surface(RoundedCornerShape(18.dp), if (message.first) Purple.copy(.22f) else Panel, border = BorderStroke(1.dp, if (message.first) Purple.copy(.4f) else Color.White.copy(.04f))) {
-                        Text(message.second, Modifier.padding(12.dp), Color.White, 14.sp)
+                        Text(text = message.second, modifier = Modifier.padding(12.dp), color = Color.White, fontSize = 14.sp)
                     }
                 }
             }
@@ -243,7 +243,7 @@ private fun ResponsiveChat(onBack: () -> Unit, onModels: () -> Unit) {
                         messages += false to "Local AI error: ${e.message ?: "model unavailable"}"
                     } finally { busy = false }
                 }
-            }) { Icon(Icons.Default.Send, "Send", tint = if (input.isNotBlank() && !busy) Cyan else Muted, modifier = Modifier.size(29.dp)) }
+            }) { Icon(imageVector = Icons.Default.Send, contentDescription = "Send", tint = if (input.isNotBlank() && !busy) Cyan else Muted, modifier = Modifier.size(29.dp)) }
         }
     }
 }
@@ -289,9 +289,9 @@ private fun ResponsiveModels(onBack: () -> Unit) {
         if (downloading && total > 0) LinearProgressIndicator(progress = { (done.toFloat() / total).coerceIn(0f, 1f) }, Modifier.fillMaxWidth(), color = Cyan)
         Spacer(Modifier.height(8.dp))
         Button(
-            enabled = !downloading && !installed,
             onClick = { scope.launch { downloading = true; error = null; done = 0; total = 0; try { LlmModelInstaller(store).download { d, t -> done = d; total = t }; installed = true } catch (e: Exception) { error = e.message ?: "Download failed" } finally { downloading = false } } },
-            Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple), shape = RoundedCornerShape(15.dp)
+            enabled = !downloading && !installed,
+            modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple), shape = RoundedCornerShape(15.dp)
         ) { Icon(Icons.Default.Download, null); Spacer(Modifier.width(7.dp)); Text(if (downloading) "Downloading…" else if (installed) "Model Installed" else "Download Qwen Model", fontWeight = FontWeight.Bold) }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(enabled = !downloading, onClick = { launcher.launch(arrayOf("application/octet-stream", "application/*")) }, Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(15.dp)) {
@@ -299,14 +299,14 @@ private fun ResponsiveModels(onBack: () -> Unit) {
         }
         error?.let { Text(it, Color(0xFFFF7187), 11.sp, Modifier.padding(top = 9.dp)) }
         Spacer(Modifier.height(18.dp))
-        Text("Pipeline", Color.White, 15.sp, FontWeight.Bold)
-        Text("Audio → VAD → Hindi STT → Local Qwen → TTS", Muted, 12.sp, Modifier.padding(top = 5.dp))
+        Text(text = "Pipeline", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Text(text = "Audio → VAD → Hindi STT → Local Qwen → TTS", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
     }
 }
 
 @Composable
 private fun PageHeader(title: String, onBack: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }; Text(title, Color.White, 24.sp, FontWeight.Bold) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }; Text(text = title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold) }
 }
 
 @Composable
@@ -314,7 +314,7 @@ private fun SettingCard(title: String, subtitle: String, icon: androidx.compose.
     Surface(Modifier.fillMaxWidth().padding(bottom = 10.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier), RoundedCornerShape(20.dp), Panel, border = BorderStroke(1.dp, Color.White.copy(.035f))) {
         Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(Modifier.size(43.dp), RoundedCornerShape(13.dp), Panel2) { Icon(icon, null, tint = if (title == "AI Models") Cyan else Purple, modifier = Modifier.padding(10.dp)) }
-            Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(title, Color.White, 13.sp, FontWeight.SemiBold); Text(subtitle, Muted, 10.sp) }
+            Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(text = title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold); Text(text = subtitle, color = Muted, fontSize = 10.sp) }
             if (onClick != null) Icon(Icons.Default.ChevronRight, null, Muted)
         }
     }
@@ -325,8 +325,8 @@ private fun ModelCard(title: String, subtitle: String, installed: Boolean) {
     Surface(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), Panel, border = BorderStroke(1.dp, if (installed) Cyan.copy(.45f) else Purple.copy(.45f))) {
         Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(Modifier.size(48.dp), RoundedCornerShape(14.dp), Panel2) { Icon(Icons.Default.Memory, null, Cyan, Modifier.padding(12.dp)) }
-            Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(title, Color.White, 14.sp, FontWeight.Bold); Text(subtitle, Muted, 10.sp) }
-            Text(if (installed) "READY" else "OFFLINE", if (installed) Cyan else Muted, 9.sp, FontWeight.Bold)
+            Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(text = title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(text = subtitle, color = Muted, fontSize = 10.sp) }
+            Text(text = if (installed) "READY" else "OFFLINE", color = if (installed) Cyan else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
