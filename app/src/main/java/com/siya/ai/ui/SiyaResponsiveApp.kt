@@ -49,17 +49,27 @@ import com.siya.ai.llm.LlmModelInstaller
 import com.siya.ai.llm.LlmModelStore
 import com.siya.ai.llm.LocalLlmEngine
 import com.siya.ai.service.VoiceSessionState
+import com.siya.ai.service.TtsModelStore
+import com.siya.ai.service.VoiceModelInstaller
+import com.siya.ai.stt.SttModelStore
+import com.siya.ai.vad.VadModelStore
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
 
-private val Bg = Color(0xFF02040A)
-private val Panel = Color(0xFF08111F)
-private val Panel2 = Color(0xFF101B31)
-private val Purple = Color(0xFF9B5CFF)
-private val Blue = Color(0xFF168BFF)
-private val Cyan = Color(0xFF21D4FF)
-private val Muted = Color(0xFF8995AB)
+private val Bg = Color(0xFF020611)
+private val Deep = Color(0xFF030A17)
+private val Panel = Color(0xFF071426)
+private val Panel2 = Color(0xFF0B1B31)
+private val Purple = Color(0xFF9B4DFF)
+private val Violet = Color(0xFF6E35FF)
+private val Blue = Color(0xFF148CFF)
+private val Cyan = Color(0xFF13D9FF)
+private val Pink = Color(0xFFDB43FF)
+private val Green = Color(0xFF18F5B1)
+private val Red = Color(0xFFFF4B73)
+private val White = Color(0xFFF4F8FF)
+private val Muted = Color(0xFF93A7C2)
 
 @Composable
 fun SiyaResponsiveApp(
