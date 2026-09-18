@@ -9,8 +9,8 @@ class LlmPart5Test {
     @Test
     fun defaultConfigIsMobileAdaptiveAndFast() {
         val config = LlmConfig()
-        assertEquals(512, config.contextSize)
-        assertEquals(12, config.maxTokens)
+        assertEquals(2048, config.contextSize)
+        assertEquals(256, config.maxTokens)
         assertTrue(config.threads in 2..6)
     }
 
