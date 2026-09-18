@@ -57,7 +57,11 @@ class LocalTtsEngine(
                     chunkText(text).forEach { chunk ->
                         if (!neural.generateChunk(chunk, generation, settings.speechRate)) return@submit
                     }
-                }.onFailure { onReady(false) }
+                }.onFailure {
+                    // A present-but-broken neural model must never make Siya silent.
+                    // Fall back to Android's device-local TTS for this reply.
+                    speakAndroidFallback(text)
+                }
             }
             return
         }
@@ -84,7 +88,10 @@ class LocalTtsEngine(
             val generation = streamingGeneration ?: neural.startGeneration(settings.speechRate).also { streamingGeneration = it }
             neuralJob = worker.submit {
                 runCatching { neural.generateChunk(text.trim(), generation, settings.speechRate) }
-                    .onFailure { onReady(false) }
+                    .onFailure {
+                        // Keep the same text flowing through the local Android TTS path.
+                        speakAndroidChunk(text.trim(), TextToSpeech.QUEUE_ADD)
+                    }
             }
             return true
         }
@@ -105,6 +112,30 @@ class LocalTtsEngine(
         streamingGeneration = null
         neural.stopGeneration()
         tts?.stop()
+    }
+
+    @Synchronized
+    private fun speakAndroidFallback(text: String) {
+        if (!ready) {
+            pendingSpeech = text
+            return
+        }
+        chunkText(text).forEachIndexed { index, chunk ->
+            speakAndroidChunk(
+                chunk,
+                if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD,
+            )
+        }
+    }
+
+    private fun speakAndroidChunk(text: String, queueMode: Int) {
+        if (text.isBlank() || !ready) return
+        tts?.speak(
+            text,
+            queueMode,
+            null,
+            "siya-fallback-${System.nanoTime()}",
+        )
     }
 
     companion object {
