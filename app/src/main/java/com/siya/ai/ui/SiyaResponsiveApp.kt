@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -84,11 +85,26 @@ fun SiyaResponsiveApp(
     val voice by VoiceSessionState.state.collectAsState()
     MaterialTheme(colorScheme = darkColorScheme(primary = Purple, background = Bg, surface = Panel)) {
         Surface(Modifier.fillMaxSize(), color = Bg) {
-            when (page) {
-                "chat" -> PixelChat(onBack = { page = "home" }, onModels = { page = "models" })
-                "models" -> ModelHome(onBack = { page = "settings" }, onAllModels = { page = "allModels" }, onSpeech = { page = "speech" }, onImport = { page = "import" })
-                "settings" -> ResponsiveSettings(onBack = { page = "home" }, onChat = { page = "chat" }, onModels = { page = "models" })
-                else -> PixelHome(
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val baseWidth = 390.dp
+                val baseHeight = 820.dp
+                val scale = minOf(maxWidth / baseWidth, maxHeight / baseHeight)
+                    .coerceIn(0.82f, 1.10f)
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(
+                        density.density * scale,
+                        density.fontScale
+                    )
+                ) {
+                    when (page) {
+                        "chat" -> PixelChat(onBack = { page = "home" }, onModels = { page = "models" })
+                        "models" -> ModelHome(onBack = { page = "home" }, onAllModels = { page = "allModels" }, onSpeech = { page = "speech" }, onImport = { page = "import" })
+                        "allModels" -> AllModels(onBack = { page = "models" })
+                        "speech" -> SpeechModels(onBack = { page = "models" })
+                        "import" -> ImportModelPage(onBack = { page = "models" })
+                        "settings" -> ResponsiveSettings(onBack = { page = "home" }, onChat = { page = "chat" }, onModels = { page = "models" })
+                        else -> PixelHome(
                     microphoneGranted = microphoneGranted,
                     voice = voice,
                     onChat = { page = "chat" },
@@ -98,7 +114,9 @@ fun SiyaResponsiveApp(
                         if (!microphoneGranted) onRequestPermissions()
                         else if (voice.active) onStopVoice() else onStartVoice()
                     }
-                )
+                        )
+                    }
+                }
             }
         }
     }
