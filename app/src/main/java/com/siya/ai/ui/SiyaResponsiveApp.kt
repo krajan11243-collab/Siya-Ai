@@ -377,7 +377,7 @@ private fun ModelHome(onBack: () -> Unit, onAllModels: () -> Unit, onSpeech: () 
             Spacer(Modifier.height(14.dp))
             ModelHomeCard("Download Speech Models", "Download VAD, STT and all related models", "(One Click)", Cyan, Icons.Default.GraphicEq, onSpeech)
             Spacer(Modifier.height(14.dp))
-            ModelHomeCard("Import GGUF", "Select and import your own model file", "", Purple, Icons.Default.FolderOpen, onImport)
+            ModelHomeCard("Import GGUF", "Select and import your own model file", "Verified local GGUF • SHA-256 integrity check", Purple, Icons.Default.FolderOpen, onImport)
             Spacer(Modifier.height(18.dp))
             NeonSurface(Modifier.fillMaxWidth(), Blue, 16.dp) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -389,39 +389,54 @@ private fun ModelHome(onBack: () -> Unit, onAllModels: () -> Unit, onSpeech: () 
             Spacer(Modifier.weight(1f))
         }
         if (showRequirements) {
-            AlertDialog(
-                onDismissRequest = { showRequirements = false },
-                containerColor = Deep, titleContentColor = White, textContentColor = Muted,
-                shape = RoundedCornerShape(24.dp),
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        NeonIconBox(Icons.Default.PhoneAndroid, Green, 46.dp)
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text("Mobile Requirements", color = White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("Siya Ai • On-Device Runtime", color = Green, fontSize = 10.sp)
-                        }
-                    }
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RequirementRow(Icons.Default.Android, "Android", "Android 11+ background microphone behavior is subject to OS, foreground-service and OEM policies.", Green)
-                        RequirementRow(Icons.Default.Memory, "RAM", "RAM, latency and battery values are targets; actual usage depends on the selected model and device.", Purple)
-                        RequirementRow(Icons.Default.Storage, "Model Storage", "~1.1 GB Q4 LLM + ~80 MB STT + ~2 MB VAD + ~180 MB TTS are the master-plan estimates; exact size varies by build.", Cyan)
-                        RequirementRow(Icons.Default.WifiOff, "Offline", "Core conversation is designed to work without internet after required models are installed.", Blue)
-                        RequirementRow(Icons.Default.GraphicEq, "Audio", "AEC/Noise Suppression are device-dependent; headset/Bluetooth and noisy-room behavior require real-device testing.", Pink)
-                        RequirementRow(Icons.Default.BatteryChargingFull, "Battery", "Background operation follows Android service rules; battery behavior must be measured on the real device.", Green)
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showRequirements = false }) {
-                        Text("CLOSE", color = Green, fontWeight = FontWeight.Bold)
-                    }
-                }
-            )
+            DeviceRequirementsDialog(onDismiss = { showRequirements = false })
         }
     }
 }
+
+@Composable
+private fun DeviceRequirementsDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Deep,
+        titleContentColor = White,
+        textContentColor = Muted,
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                NeonIconBox(Icons.Default.PhoneAndroid, Green, 48.dp)
+                Spacer(Modifier.width(11.dp))
+                Column {
+                    Text("Mobile Requirements", color = White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Siya Ai • On-Device Runtime", color = Green, fontSize = 10.sp)
+                }
+            }
+        },
+        text = {
+            Column(
+                Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                RequirementRow(Icons.Default.Memory, "RAM", "Minimum 6 GB • 8 GB recommended for the complete local AI stack.", Purple)
+                RequirementRow(Icons.Default.DeveloperBoard, "Processor / CPU", "Snapdragon 7-series / 8-series or MediaTek Dimensity class processor recommended.", Cyan)
+                RequirementRow(Icons.Default.Speed, "GPU / Acceleration", "Vulkan-capable GPU is required/recommended for supported mobile acceleration; actual performance depends on device/runtime.", Blue)
+                RequirementRow(Icons.Default.Storage, "Storage", "Plan roughly 1.4 GB for the current core model set: Qwen ~1.1 GB + STT ~80 MB + VAD ~2 MB + TTS ~180 MB. Keep additional free space for downloads and updates.", Green)
+                RequirementRow(Icons.Default.Android, "Android", "Android 11+ is the target for background microphone behavior, subject to Android, foreground-service and OEM restrictions.", Cyan)
+                RequirementRow(Icons.Default.WifiOff, "Offline", "After required models are installed, core conversation is designed to work without internet. Cloud services are not mandatory for the core runtime.", Blue)
+                RequirementRow(Icons.Default.GraphicEq, "Audio", "16 kHz mono PCM is the canonical internal audio format. AEC/Noise Suppression, headset and Bluetooth behavior are device-dependent.", Pink)
+                RequirementRow(Icons.Default.BatteryChargingFull, "Battery / RAM", "RAM, latency and battery figures are targets, not guarantees. Heavy models may be unloaded under memory pressure.", Green)
+                RequirementRow(Icons.Default.Security, "Model Safety", "Model files use local integrity/checksum validation; invalid or missing files should produce a recoverable error.", Purple)
+                RequirementRow(Icons.Default.Info, "Testing", "Real-device testing is required for screen-off, Doze, low-memory, noisy-room, headset/Bluetooth, barge-in and long-run behavior.", Blue)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CLOSE", color = Green, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}
+
 
 @Composable
 private fun RequirementRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String, accent: Color) {
@@ -463,6 +478,7 @@ private fun ModelHomeCard(title: String, subtitle: String, detail: String, accen
 
 @Composable
 private fun AllModels(onBack: () -> Unit) {
+    var showRequirements by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val store = remember { LlmModelStore(context) }
@@ -488,7 +504,7 @@ private fun AllModels(onBack: () -> Unit) {
         Triple("Yi 1.5 6B", "Multilingual model", "~3.9 GB")
     )
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 15.dp, vertical = 8.dp)) {
-        NeonHeader("AI All Model Download Select", "Choose and download AI models for offline use", onBack, Icons.Default.PhoneAndroid, Green)
+        NeonHeader("AI All Model Download Select", "Choose and download AI models for offline use", onBack, Icons.Default.PhoneAndroid, Green, onIconClick = { showRequirements = true })
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             items(rows) { row ->
                 val isQwen = row.first == "Qwen 2.5 1.5B"
@@ -877,12 +893,12 @@ private fun NeonAvatar(){
 }
 
 @Composable
-private fun NeonHeader(title:String,subtitle:String,onBack:()->Unit,icon:androidx.compose.ui.graphics.vector.ImageVector,accent:Color){
+private fun NeonHeader(title:String,subtitle:String,onBack:()->Unit,icon:androidx.compose.ui.graphics.vector.ImageVector,accent:Color,onIconClick:(()->Unit)?=null){
     Row(Modifier.fillMaxWidth().height(66.dp),verticalAlignment=Alignment.CenterVertically){
         NeonSurface(Modifier.size(48.dp).clickable(onClick=onBack),Cyan,15.dp){Icon(imageVector=Icons.AutoMirrored.Filled.ArrowBack,contentDescription="Back",tint=White,modifier=Modifier.padding(10.dp))}
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)){Text(text=title,color=White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text(text=subtitle,color=Muted,fontSize=11.sp)}
-        NeonSurface(Modifier.size(48.dp),accent,15.dp){Icon(imageVector=icon,contentDescription=null,tint=accent,modifier=Modifier.padding(11.dp))}
+        NeonSurface(Modifier.size(48.dp).then(if(onIconClick!=null) Modifier.clickable(onClick=onIconClick) else Modifier),accent,15.dp){Icon(imageVector=icon,contentDescription="Device requirements",tint=accent,modifier=Modifier.padding(11.dp))}
     }
 }
 
