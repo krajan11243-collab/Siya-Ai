@@ -59,15 +59,28 @@ class LlmExecutor(
         currentJob = scope.launch {
             try {
                 currentCoroutineContext().ensureActive()
-                // If warm-up is still loading, wait for it rather than starting
-                // another native model load.
+
+                // Simple greetings must answer immediately. Do not make them wait
+                // for the 1+ GB GGUF warm-up.
+                val fastAnswer = LlmFastPath.answer(prompt)
+                if (fastAnswer != null) {
+                    onToken(fastAnswer)
+                    val result = LlmResult(
+                        text = fastAnswer,
+                        tokensPerSecond = Float.POSITIVE_INFINITY,
+                    )
+                    if (!closed.get() && myTurn == turnId.get() && currentCoroutineContext().isActive) {
+                        onResult(Result.success(result))
+                    }
+                    return@launch
+                }
+
+                // For a real generation, wait for the single background warm-up
+                // instead of loading the native model twice.
                 warmupJob?.join()
                 currentCoroutineContext().ensureActive()
 
-                val result: LlmResult = LlmFastPath.answer(prompt)?.let { fast ->
-                    onToken(fast)
-                    LlmResult(text = fast, tokensPerSecond = Float.POSITIVE_INFINITY)
-                } ?: run {
+                val result: LlmResult = run {
                     val loaded = engine ?: engineFactory().also {
                         it.load()
                         engine = it
