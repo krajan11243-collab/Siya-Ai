@@ -113,7 +113,9 @@ private fun PixelHome(
     onRequestPermissions: () -> Unit,
     onVoice: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 18.dp, vertical = 8.dp)) {
+    Box(Modifier.fillMaxSize().background(Bg)){
+        HomeAmbientBackground()
+        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 18.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth().height(70.dp), verticalAlignment = Alignment.CenterVertically) {
             HomeHeaderButton(Icons.Default.ChatBubble, "CHAT", Cyan, onChat)
             Spacer(Modifier.weight(1f))
@@ -153,6 +155,23 @@ private fun PixelHome(
         NeonMicButton(active = voice.active, onClick = onVoice)
         Text(text=if (!microphoneGranted) "Tap to allow microphone" else if (voice.active) "Tap to stop" else "Tap to speak", modifier=Modifier.fillMaxWidth().padding(top=5.dp), color=Muted, fontSize=10.sp, textAlign=TextAlign.Center)
         Text(text="—   A L W A Y S   W I T H   Y O U   —", modifier=Modifier.fillMaxWidth().padding(top=8.dp), color=Blue, fontSize=8.sp, letterSpacing=2.3.sp, textAlign=TextAlign.Center)
+        }
+    }
+}
+@Composable
+private fun HomeAmbientBackground(){
+    val transition=rememberInfiniteTransition(label="home-ambient")
+    val pulse by transition.animateFloat(0f,1f,infiniteRepeatable(tween(4200,easing=FastOutSlowInEasing),RepeatMode.Reverse),label="pulse")
+    Canvas(Modifier.fillMaxSize()){
+        val w=size.width; val h=size.height
+        drawCircle(Purple.copy(.08f),w*.72f,Offset(w*.82f,h*.08f))
+        drawCircle(Cyan.copy(.05f),w*.55f,Offset(w*.08f,h*.72f))
+        val r=w*.44f
+        drawArc(Purple.copy(.25f+pulse*.08f),205f,130f,false,Offset(w/2-r,h*.30f),androidx.compose.ui.geometry.Size(r*2,r*2),style=Stroke(2.2.dp.toPx()))
+        drawArc(Cyan.copy(.22f+pulse*.08f),25f,130f,false,Offset(w/2-r,h*.30f),androidx.compose.ui.geometry.Size(r*2,r*2),style=Stroke(2.2.dp.toPx()))
+        val y=h*.91f
+        val path=androidx.compose.ui.graphics.Path().apply{moveTo(0f,y);cubicTo(w*.18f,y-h*.045f,w*.32f,y+h*.035f,w*.50f,y);cubicTo(w*.68f,y-h*.035f,w*.82f,y+h*.045f,w,y-h*.01f)}
+        drawPath(path,Brush.horizontalGradient(listOf(Color.Transparent,Cyan.copy(.35f),Purple.copy(.35f),Color.Transparent)),style=Stroke(2.5.dp.toPx()))
     }
 }
 
@@ -209,6 +228,13 @@ private fun ModelHome(onBack: () -> Unit, onAllModels: () -> Unit, onSpeech: () 
 @Composable
 private fun ModelHomeCard(title: String, subtitle: String, detail: String, accent: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
     NeonSurface(Modifier.fillMaxWidth().height(151.dp).clickable(onClick = onClick), accent, 24.dp) {
+        Box(Modifier.fillMaxSize()){
+            Canvas(Modifier.matchParentSize()){
+                val w=size.width; val h=size.height
+                val p=androidx.compose.ui.graphics.Path().apply{moveTo(w*.35f,h*.98f);cubicTo(w*.54f,h*.42f,w*.72f,h*.94f,w*.98f,h*.18f)}
+                drawPath(p,Brush.horizontalGradient(listOf(Color.Transparent,accent.copy(.24f),Cyan.copy(.16f))),style=Stroke(1.4.dp.toPx()))
+                drawCircle(accent.copy(.09f),h*.72f,Offset(w*.90f,h*.88f))
+            }
         Row(Modifier.fillMaxSize().padding(22.dp), verticalAlignment = Alignment.CenterVertically) {
             NeonIconBox(icon, accent, 72.dp)
             Spacer(Modifier.width(18.dp))
@@ -218,6 +244,7 @@ private fun ModelHomeCard(title: String, subtitle: String, detail: String, accen
                 if (detail.isNotBlank()) Text(text=detail, color=Muted, fontSize=12.sp, modifier=Modifier.padding(top=2.dp))
             }
             NeonArrow(accent)
+        }
         }
     }
 }
@@ -344,10 +371,27 @@ private fun SpeechRow(title:String, subtitle:String, size:String, accent:Color, 
 }
 
 @Composable
+private fun ModelLogo(title:String,accent:Color){
+    val symbol=when{
+        title.startsWith("GPT")->"✦"
+        title.startsWith("Gemini")->"G"
+        title.startsWith("Llama")->"∞"
+        title.startsWith("Qwen")->"✥"
+        title.startsWith("DeepSeek")->"◈"
+        title.startsWith("Mistral")||title.startsWith("Mixtral")->"M"
+        title.startsWith("Phi")->"✦"
+        else->"◇"
+    }
+    NeonSurface(Modifier.size(48.dp),accent,14.dp){
+        Text(symbol,color=accent,fontSize=25.sp,fontWeight=FontWeight.ExtraBold,textAlign=TextAlign.Center)
+    }
+}
+
+@Composable
 private fun ModelRow(title:String, subtitle:String, size:String, accent:Color, installed:Boolean, downloading:Boolean, progress:Float, enabled:Boolean, onDownload:()->Unit, onDelete:(()->Unit)?) {
     NeonSurface(Modifier.fillMaxWidth(), accent, 17.dp) {
         Row(Modifier.padding(11.dp),verticalAlignment=Alignment.CenterVertically) {
-            NeonIconBox(Icons.Default.Memory, accent, 48.dp)
+            ModelLogo(title, accent)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
