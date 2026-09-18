@@ -356,11 +356,12 @@ private fun ModelRow(title:String, subtitle:String, size:String, accent:Color, i
 private fun ImportModelPage(onBack:()->Unit) {
     val context=LocalContext.current
     val store=remember{LlmModelStore(context)}
+    val scope=rememberCoroutineScope()
     var status by remember{mutableStateOf(if(store.isInstalled())"Qwen model is installed." else "Select a verified Qwen GGUF file.")}
     val launcher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri:Uri?->
         if(uri==null)return@rememberLauncherForActivityResult
         status="Importing…"
-        LaunchedImport(context,uri,store){status=it}
+        scope.launch { try { importModel(context,uri,store); status="Import complete • Qwen model is READY." } catch(e:Exception) { status="Import failed: "+(e.message ?: "invalid GGUF") } }
     }
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(18.dp)) {
         NeonHeader("Import GGUF","Select and import your own model file",onBack,Icons.Default.FolderOpen,Purple)
@@ -378,14 +379,6 @@ private fun ImportModelPage(onBack:()->Unit) {
                 Text(status,Muted,10.sp,Modifier.padding(top=10.dp),textAlign=TextAlign.Center)
             }
         }
-    }
-}
-
-@Composable
-private fun LaunchedImport(context:Context,uri:Uri,store:LlmModelStore,update:(String)->Unit) {
-    LaunchedEffect(uri) {
-        try { importModel(context,uri,store); update("Import complete • Qwen model is READY.") }
-        catch(e:Exception){ update("Import failed: "+(e.message ?: "invalid GGUF")) }
     }
 }
 
