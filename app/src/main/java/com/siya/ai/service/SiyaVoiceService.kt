@@ -338,7 +338,7 @@ class SiyaVoiceService : Service() {
                             // This is the critical barge-in path: old work must not be
                             // allowed to answer after the user has started a new turn.
                             llmExecutor?.cancelCurrent()
-                            sttPipeline?.reset()
+                            sttPipeline?.cancelPending()
                             tts?.stop()
                             synchronized(streamLock) { streamBuffer.setLength(0); firstTtsChunk = true }
                             VoiceSessionState.listening()
