@@ -515,7 +515,7 @@ private fun NeonArrow(accent:Color){
 }
 
 @Composable
-private fun NeonSurface(modifier:Modifier,accent:Color,shapeDp:androidx.compose.ui.unit.Dp,content:@Composable()->Unit){
+private fun NeonSurface(modifier:Modifier,accent:Color,shapeDp:androidx.compose.ui.unit.Dp,content: @Composable () -> Unit){
     Surface(modifier=modifier,shape=RoundedCornerShape(shapeDp),color=Panel.copy(.92f),border=BorderStroke(1.dp,accent.copy(.60f)),shadowElevation=0.dp,content=content)
 }
 
