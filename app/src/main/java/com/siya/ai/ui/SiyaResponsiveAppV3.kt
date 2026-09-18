@@ -33,6 +33,7 @@ import com.siya.ai.service.VoiceModelInstaller
 import com.siya.ai.service.VoiceSessionState
 import com.siya.ai.stt.SttModelStore
 import com.siya.ai.vad.VadModelStore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val Bg = Color(0xFF030712)
@@ -256,6 +257,6 @@ private fun SettingsScreen(onBack: () -> Unit, onModels: () -> Unit, onChat: () 
 @Composable
 private fun Setting(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
     Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick), RoundedCornerShape(15.dp), color = Panel, border = BorderStroke(1.dp, Color.White.copy(.05f))) {
-        Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Cyan, Modifier.size(22.dp)); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Text(subtitle, color = Muted, fontSize = 8.sp) }; Icon(Icons.Default.ChevronRight, null, tint = Muted) }
+        Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, contentDescription = null, tint = Cyan, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp); Text(subtitle, color = Muted, fontSize = 8.sp) }; Icon(Icons.Default.ChevronRight, null, tint = Muted) }
     }
 }
