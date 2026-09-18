@@ -3,11 +3,11 @@ package com.siya.ai.vad
 /** Streaming Silero VAD v5 configuration for 16 kHz mono audio. */
 data class VadConfig(
     val sampleRate: Int = 16_000,
-    val threshold: Float = 0.5f,
+    val threshold: Float = 0.45f,
     val endThresholdHysteresis: Float = 0.15f,
     val minSpeechDurationMs: Long = 250,
-    val minSilenceDurationMs: Long = 100,
-    val speechPadMs: Long = 30
+    val minSilenceDurationMs: Long = 650,
+    val speechPadMs: Long = 80
 ) {
     init {
         require(sampleRate == 16_000) { "Part 3 currently targets Silero 16 kHz mode" }
