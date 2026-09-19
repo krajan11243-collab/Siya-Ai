@@ -33,12 +33,14 @@ class LocalTtsEngine(
             tts?.setPitch(settings.pitch)
             val requested = Locale.forLanguageTag(settings.localeTag)
             val result = tts?.setLanguage(requested) ?: TextToSpeech.LANG_NOT_SUPPORTED
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) tts?.setLanguage(Locale.US)
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                tts?.setLanguage(Locale.US)
+            }
         }
         onReady(ready || neural.isInstalled())
         if (ready) {
             val pending = synchronized(this) { pendingSpeech.also { pendingSpeech = null } }
-            if (!pending.isNullOrBlank()) speak(pending)
+            if (!pending.isNullOrBlank()) speakAndroidFallback(pending)
         }
     }
 
@@ -52,32 +54,30 @@ class LocalTtsEngine(
         stop()
         if (neural.isInstalled()) {
             neuralJob = worker.submit {
+                var success = false
                 runCatching {
                     val generation = neural.startGeneration(settings.speechRate)
-                    chunkText(text).forEach { chunk ->
-                        if (!neural.generateChunk(chunk, generation, settings.speechRate)) return@submit
+                    success = true
+                    for (chunk in chunkText(text)) {
+                        if (!neural.generateChunk(chunk, generation, settings.speechRate)) {
+                            success = false
+                            break
+                        }
                     }
-                }.onFailure {
-                    // A present-but-broken neural model must never make Siya silent.
-                    // Fall back to Android's device-local TTS for this reply.
-                    speakAndroidFallback(text)
-                }
+                }.onFailure { success = false }
+                if (!success) speakAndroidFallback(text)
             }
             return
         }
-        if (!ready) {
-            pendingSpeech = text
-            return
-        }
-        chunkText(text).forEachIndexed { index, chunk ->
-            tts?.speak(chunk, if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "siya-${System.nanoTime()}-$index")
-        }
+        speakAndroidFallback(text)
     }
 
     @Synchronized
     fun beginStreaming() {
         stop()
-        if (neural.isInstalled()) streamingGeneration = neural.startGeneration(settings.speechRate)
+        if (neural.isInstalled()) {
+            streamingGeneration = runCatching { neural.startGeneration(settings.speechRate) }.getOrNull()
+        }
     }
 
     /** Queues one sentence/phrase into the same cancellable reply generation. */
@@ -85,17 +85,24 @@ class LocalTtsEngine(
     fun streamChunk(text: String): Boolean {
         if (text.isBlank()) return true
         if (neural.isInstalled()) {
-            val generation = streamingGeneration ?: neural.startGeneration(settings.speechRate).also { streamingGeneration = it }
+            val generation = streamingGeneration ?: runCatching {
+                neural.startGeneration(settings.speechRate)
+            }.getOrNull().also { streamingGeneration = it }
+            if (generation == null) {
+                speakAndroidChunk(text.trim(), TextToSpeech.QUEUE_ADD)
+                return ready
+            }
             neuralJob = worker.submit {
-                runCatching { neural.generateChunk(text.trim(), generation, settings.speechRate) }
-                    .onFailure {
-                        // Keep the same text flowing through the local Android TTS path.
-                        speakAndroidChunk(text.trim(), TextToSpeech.QUEUE_ADD)
-                    }
+                var ok = false
+                runCatching { ok = neural.generateChunk(text.trim(), generation, settings.speechRate) }
+                if (!ok) speakAndroidChunk(text.trim(), TextToSpeech.QUEUE_ADD)
             }
             return true
         }
-        if (!ready) return false
+        if (!ready) {
+            pendingSpeech = text
+            return false
+        }
         tts?.speak(text.trim(), TextToSpeech.QUEUE_ADD, null, "siya-stream-${System.nanoTime()}")
         return true
     }
