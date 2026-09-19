@@ -57,6 +57,7 @@ class SiyaVoiceService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        VoiceDiagnostics.log("SERVICE", "CREATED")
         createChannel()
         actionExecutor = AgentActionExecutor(this)
         startForeground(NOTIFICATION_ID, buildNotification("Preparing offline voice models"))
@@ -66,7 +67,9 @@ class SiyaVoiceService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        VoiceDiagnostics.log("SERVICE", "START_COMMAND", "startId=$startId")
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            VoiceDiagnostics.log("MIC", "PERMISSION_MISSING")
             VoiceSessionState.error("Microphone permission is required")
             stopSelf()
             return START_NOT_STICKY
@@ -74,6 +77,7 @@ class SiyaVoiceService : Service() {
         return try {
             ensureModelsInitialized()
             if (audioEngine?.isRunning() == true) {
+                VoiceDiagnostics.log("MIC", "ALREADY_RUNNING")
                 VoiceSessionState.listening()
                 return START_STICKY
             }
@@ -88,16 +92,20 @@ class SiyaVoiceService : Service() {
                 return START_NOT_STICKY
             }
             val engine = audioEngine ?: AudioEngine(this, onPcm = ::onPcm).also { audioEngine = it }
+            VoiceDiagnostics.log("MIC", "STARTING")
             if (!engine.start()) {
+                VoiceDiagnostics.log("MIC", "START_FAILED", "AudioRecord could not start")
                 VoiceSessionState.error("Microphone unavailable on this device")
                 updateNotification("Microphone unavailable")
                 stopSelf()
                 return START_NOT_STICKY
             }
+            VoiceDiagnostics.log("MIC", "STARTED", "AudioRecord callback active")
             VoiceSessionState.listening()
             updateNotification("Listening • VAD + Hindi STT + streaming AI + TTS ready")
             START_STICKY
         } catch (error: Throwable) {
+            VoiceDiagnostics.log("SERVICE", "START_ERROR", error.message ?: error.javaClass.simpleName)
             val message = error.message ?: error.javaClass.simpleName
             VoiceSessionState.error("Voice engine could not start: $message")
             updateNotification("Voice engine error — check Models")
@@ -107,6 +115,7 @@ class SiyaVoiceService : Service() {
     }
 
     private fun ensureModelsInitialized() {
+        VoiceDiagnostics.log("MODELS", "CHECKING")
         initializeLlmIfInstalled()
         initializeSttIfInstalled()
         initializeVadIfInstalled()
@@ -116,10 +125,15 @@ class SiyaVoiceService : Service() {
     private fun initializeLlmIfInstalled() {
         if (llmExecutor != null) return
         val store = LlmModelStore(this)
-        if (!store.isInstalled()) return
+        if (!store.isInstalled()) {
+            VoiceDiagnostics.log("LLM", "MODEL_MISSING")
+            return
+        }
+        VoiceDiagnostics.log("LLM", "MODEL_FOUND")
         llmExecutor = runCatching {
             LlmExecutor(engineFactory = { LocalLlmEngine(store) }) { result ->
                 result.onSuccess { answer ->
+                    VoiceDiagnostics.log("LLM", "COMPLETE", "chars=${answer.text.length}")
                     flushLlmTts(answer.text)
                     cancelTurnTimeout()
                     if (answer.text.isNotBlank()) {
@@ -132,6 +146,7 @@ class SiyaVoiceService : Service() {
                         updateNotification("Empty local AI response • recovery spoken")
                     }
                 }.onFailure { error ->
+                    VoiceDiagnostics.log("LLM", "ERROR", error.message ?: error.javaClass.simpleName)
                     cancelTurnTimeout()
                     tts?.stop()
                     val recovery = "माफ़ कीजिए, लोकल AI में अभी समस्या आई है। कृपया दोबारा बोलिए।"
@@ -141,6 +156,7 @@ class SiyaVoiceService : Service() {
                 }
             }
         }.onFailure {
+            VoiceDiagnostics.log("LLM", "INIT_ERROR", it.message ?: it.javaClass.simpleName)
             VoiceSessionState.error("Qwen engine error: ${it.message ?: it.javaClass.simpleName}")
             null
         }.getOrNull()
@@ -149,19 +165,28 @@ class SiyaVoiceService : Service() {
     private fun initializeSttIfInstalled() {
         if (sttPipeline != null) return
         val store = SttModelStore(this)
-        if (!store.isInstalled()) return
+        if (!store.isInstalled()) {
+            VoiceDiagnostics.log("STT", "MODEL_MISSING")
+            return
+        }
+        VoiceDiagnostics.log("STT", "MODEL_FOUND")
         runCatching {
             val executor = SttExecutor { HindiSttEngine(store) }
             sttExecutor = executor
             sttPipeline = SttPipeline(executor) { result ->
-                result.onSuccess { stt -> handleTranscript(stt.text) }
+                result.onSuccess { stt ->
+                    VoiceDiagnostics.log("STT", "RESULT", "text=${stt.text.take(300)}")
+                    handleTranscript(stt.text)
+                }
                     .onFailure { error ->
+                        VoiceDiagnostics.log("STT", "ERROR", error.message ?: error.javaClass.simpleName)
                         cancelTurnTimeout()
                         VoiceSessionState.error(error.message ?: "Hindi STT error")
                         updateNotification("Hindi STT error")
                     }
             }
         }.onFailure { error ->
+            VoiceDiagnostics.log("STT", "INIT_ERROR", error.message ?: error.javaClass.simpleName)
             sttExecutor?.close()
             sttExecutor = null
             sttPipeline = null
@@ -170,6 +195,7 @@ class SiyaVoiceService : Service() {
     }
 
     private fun handleTranscript(transcript: String) {
+        VoiceDiagnostics.log("STT", "TRANSCRIPT", transcript.take(300))
         if (transcript.isBlank()) {
             cancelTurnTimeout()
             val recovery = "मैं आपकी बात साफ़ नहीं सुन पाई। कृपया फिर से बोलिए।"
@@ -214,6 +240,8 @@ class SiyaVoiceService : Service() {
             return
         }
 
+        val turn = VoiceDiagnostics.newTurn()
+        VoiceDiagnostics.log("LLM", "SUBMIT", "turn=$turn chars=${transcript.length}")
         synchronized(streamLock) {
             streamBuffer.setLength(0)
             firstTtsChunk = true
@@ -222,11 +250,13 @@ class SiyaVoiceService : Service() {
         VoiceSessionState.thinking(transcript)
         updateNotification("Thinking • streaming local response")
         startTurnTimeout()
-        llmExecutor?.submit(transcript, onToken = ::onLlmToken)
+        runCatching { llmExecutor?.submit(transcript, onToken = ::onLlmToken) }
+            .onFailure { VoiceDiagnostics.log("LLM", "SUBMIT_ERROR", it.message ?: it.javaClass.simpleName) }
     }
 
     private fun onLlmToken(token: String) {
         if (token.isBlank()) return
+        VoiceDiagnostics.log("LLM", "TOKEN", token.take(160))
         val chunks = mutableListOf<String>()
         synchronized(streamLock) {
             streamBuffer.append(token)
@@ -246,6 +276,7 @@ class SiyaVoiceService : Service() {
             }
         }
         chunks.filter { it.isNotBlank() }.forEach { chunk ->
+            VoiceDiagnostics.log("TTS", "STREAM_CHUNK", chunk.take(220))
             speakStreamChunk(chunk)
             synchronized(streamLock) { firstTtsChunk = false }
             VoiceSessionState.speaking(chunk)
@@ -261,11 +292,15 @@ class SiyaVoiceService : Service() {
             streamBuffer.setLength(0)
             firstTtsChunk = false
         }
-        if (remaining.isNotBlank()) speakStreamChunk(remaining)
+        if (remaining.isNotBlank()) {
+            VoiceDiagnostics.log("TTS", "FLUSH", remaining.take(300))
+            speakStreamChunk(remaining)
+        }
         tts?.endStreaming()
     }
 
     private fun speakActionResult(message: String, success: Boolean) {
+        VoiceDiagnostics.log("ACTION", if (success) "SUCCESS" else "FAILED", message.take(300))
         if (success) {
             tts?.endStreaming()
             VoiceSessionState.speaking(message)
@@ -281,12 +316,18 @@ class SiyaVoiceService : Service() {
         if (vad != null && vadProcessor != null) return
         val store = VadModelStore(this)
         store.restoreFromShared()
-        if (!store.isInstalled()) return
+        if (!store.isInstalled()) {
+            VoiceDiagnostics.log("VAD", "MODEL_MISSING")
+            return
+        }
+        VoiceDiagnostics.log("VAD", "MODEL_FOUND")
         runCatching {
             val engine = SileroVadEngine(store.modelFile.absolutePath)
             vad = engine
             vadProcessor = VadPcmProcessor(engine)
+            VoiceDiagnostics.log("VAD", "READY")
         }.onFailure { error ->
+            VoiceDiagnostics.log("VAD", "INIT_ERROR", error.message ?: error.javaClass.simpleName)
             vad?.close()
             vad = null
             vadProcessor = null
@@ -345,6 +386,7 @@ class SiyaVoiceService : Service() {
 
     private fun onPcm(buffer: ShortArray, length: Int) {
         if (length <= 0) return
+        VoiceDiagnostics.log("MIC", "PCM", "samples=$length")
         if (System.currentTimeMillis() < suppressVadUntilMs) return
         val handler = vadHandler ?: return
         val copy = buffer.copyOf(length)
@@ -361,6 +403,7 @@ class SiyaVoiceService : Service() {
                     pipeline.onVad(result)
                     when (result.event?.type) {
                         VadEventType.SPEECH_START -> {
+                            VoiceDiagnostics.log("VAD", "SPEECH_START")
                             VoiceSessionState.interrupting()
                             cancelTurnTimeout()
                             llmExecutor?.cancelCurrent()
@@ -371,6 +414,7 @@ class SiyaVoiceService : Service() {
                             updateNotification("Listening • previous turn cancelled")
                         }
                         VadEventType.SPEECH_END -> {
+                            VoiceDiagnostics.log("VAD", "SPEECH_END")
                             VoiceSessionState.transcribing()
                             updateNotification("Transcribing Hindi…")
                         }
@@ -378,6 +422,7 @@ class SiyaVoiceService : Service() {
                     }
                 }
             }.onFailure {
+                VoiceDiagnostics.log("VAD", "ERROR", it.message ?: it.javaClass.simpleName)
                 cancelTurnTimeout()
                 VoiceSessionState.error(it.message ?: "VAD error")
                 updateNotification("VAD error")
@@ -386,6 +431,7 @@ class SiyaVoiceService : Service() {
     }
 
     override fun onDestroy() {
+        VoiceDiagnostics.log("SERVICE", "DESTROYED")
         cancelTurnTimeout()
         pendingConfirmation = null
         tts?.stop()
