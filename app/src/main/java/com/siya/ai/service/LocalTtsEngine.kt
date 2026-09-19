@@ -28,6 +28,7 @@ class LocalTtsEngine(
 
     override fun onInit(status: Int) {
         ready = status == TextToSpeech.SUCCESS
+        VoiceDiagnostics.log("TTS", "ANDROID_INIT", "status=$status ready=$ready")
         if (ready) {
             tts?.setSpeechRate(settings.speechRate)
             tts?.setPitch(settings.pitch)
@@ -37,6 +38,7 @@ class LocalTtsEngine(
                 tts?.setLanguage(Locale.US)
             }
         }
+        VoiceDiagnostics.log("TTS", "READY_STATE", "android=$ready neural=${neural.isInstalled()}")
         onReady(ready || neural.isInstalled())
         if (ready) {
             val pending = synchronized(this) { pendingSpeech.also { pendingSpeech = null } }
@@ -51,6 +53,7 @@ class LocalTtsEngine(
     @Synchronized
     fun speak(text: String) {
         if (text.isBlank()) return
+        VoiceDiagnostics.log("TTS", "SPEAK", text.take(300))
         stop()
         if (neural.isInstalled()) {
             neuralJob = worker.submit {
@@ -65,18 +68,25 @@ class LocalTtsEngine(
                         }
                     }
                 }.onFailure { success = false }
-                if (!success) speakAndroidFallback(text)
+                if (!success) {
+                    VoiceDiagnostics.log("TTS", "NEURAL_FALLBACK", "neural generation failed")
+                    speakAndroidFallback(text)
+                }
             }
             return
         }
+        VoiceDiagnostics.log("TTS", "ANDROID_FALLBACK", "neural model not installed")
         speakAndroidFallback(text)
     }
 
     @Synchronized
     fun beginStreaming() {
+        VoiceDiagnostics.log("TTS", "STREAM_BEGIN")
         stop()
         if (neural.isInstalled()) {
-            streamingGeneration = runCatching { neural.startGeneration(settings.speechRate) }.getOrNull()
+            streamingGeneration = runCatching { neural.startGeneration(settings.speechRate) }
+                .onFailure { VoiceDiagnostics.log("TTS", "NEURAL_START_ERROR", it.message ?: it.javaClass.simpleName) }
+                .getOrNull()
         }
     }
 
@@ -89,20 +99,26 @@ class LocalTtsEngine(
                 neural.startGeneration(settings.speechRate)
             }.getOrNull().also { streamingGeneration = it }
             if (generation == null) {
+                VoiceDiagnostics.log("TTS", "STREAM_FALLBACK", "neural generation unavailable")
                 speakAndroidChunk(text.trim(), TextToSpeech.QUEUE_ADD)
                 return ready
             }
             neuralJob = worker.submit {
                 var ok = false
                 runCatching { ok = neural.generateChunk(text.trim(), generation, settings.speechRate) }
-                if (!ok) speakAndroidChunk(text.trim(), TextToSpeech.QUEUE_ADD)
+                if (!ok) {
+                    VoiceDiagnostics.log("TTS", "CHUNK_FALLBACK", text.trim().take(220))
+                    speakAndroidChunk(text.trim(), TextToSpeech.QUEUE_ADD)
+                }
             }
             return true
         }
         if (!ready) {
+            VoiceDiagnostics.log("TTS", "ANDROID_NOT_READY", text.take(220))
             pendingSpeech = text
             return false
         }
+        VoiceDiagnostics.log("TTS", "ANDROID_STREAM", text.trim().take(220))
         tts?.speak(text.trim(), TextToSpeech.QUEUE_ADD, null, "siya-stream-${System.nanoTime()}")
         return true
     }
@@ -114,6 +130,7 @@ class LocalTtsEngine(
 
     @Synchronized
     fun stop() {
+        VoiceDiagnostics.log("TTS", "STOP")
         neuralJob?.cancel(true)
         neuralJob = null
         streamingGeneration = null
@@ -124,9 +141,11 @@ class LocalTtsEngine(
     @Synchronized
     private fun speakAndroidFallback(text: String) {
         if (!ready) {
+            VoiceDiagnostics.log("TTS", "ANDROID_NOT_READY", "queued=${text.take(220)}")
             pendingSpeech = text
             return
         }
+        VoiceDiagnostics.log("TTS", "ANDROID_SPEAK", text.take(300))
         chunkText(text).forEachIndexed { index, chunk ->
             speakAndroidChunk(
                 chunk,
