@@ -53,6 +53,7 @@ class SiyaVoiceService : Service() {
     private val streamLock = Any()
     private val streamBuffer = StringBuilder()
     private var firstTtsChunk = true
+    @Volatile private var suppressVadUntilMs = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -126,7 +127,7 @@ class SiyaVoiceService : Service() {
                         updateNotification("Siya is speaking")
                     } else {
                         val recovery = "माफ़ कीजिए, मैं अभी जवाब नहीं बना पाई। कृपया फिर से बोलिए।"
-                        tts?.speak(recovery)
+                        speakResponse(recovery)
                         VoiceSessionState.speaking(recovery)
                         updateNotification("Empty local AI response • recovery spoken")
                     }
@@ -134,7 +135,7 @@ class SiyaVoiceService : Service() {
                     cancelTurnTimeout()
                     tts?.stop()
                     val recovery = "माफ़ कीजिए, लोकल AI में अभी समस्या आई है। कृपया दोबारा बोलिए।"
-                    tts?.speak(recovery)
+                    speakResponse(recovery)
                     VoiceSessionState.error(error.message ?: "Local AI error")
                     updateNotification("Local AI error • recovery spoken")
                 }
@@ -173,7 +174,7 @@ class SiyaVoiceService : Service() {
             cancelTurnTimeout()
             val recovery = "मैं आपकी बात साफ़ नहीं सुन पाई। कृपया फिर से बोलिए।"
             VoiceSessionState.speaking(recovery)
-            tts?.speak(recovery)
+            speakResponse(recovery)
             updateNotification("Speech was not understood • listening again")
             return
         }
@@ -203,7 +204,7 @@ class SiyaVoiceService : Service() {
                 cancelTurnTimeout()
                 val prompt = "क्या मैं यह action करूँ? पुष्टि के लिए हाँ बोलें, मना करने के लिए नहीं।"
                 VoiceSessionState.speaking(prompt)
-                tts?.speak(prompt)
+                speakResponse(prompt)
                 updateNotification("Confirmation required")
             } else {
                 val result = actionExecutor.execute(routed)
@@ -245,7 +246,7 @@ class SiyaVoiceService : Service() {
             }
         }
         chunks.filter { it.isNotBlank() }.forEach { chunk ->
-            tts?.streamChunk(chunk)
+            speakStreamChunk(chunk)
             synchronized(streamLock) { firstTtsChunk = false }
             VoiceSessionState.speaking(chunk)
         }
@@ -260,7 +261,7 @@ class SiyaVoiceService : Service() {
             streamBuffer.setLength(0)
             firstTtsChunk = false
         }
-        if (remaining.isNotBlank()) tts?.streamChunk(remaining)
+        if (remaining.isNotBlank()) speakStreamChunk(remaining)
         tts?.endStreaming()
     }
 
@@ -268,7 +269,7 @@ class SiyaVoiceService : Service() {
         if (success) {
             tts?.endStreaming()
             VoiceSessionState.speaking(message)
-            tts?.speak(message)
+            speakResponse(message)
             updateNotification(message)
         } else {
             VoiceSessionState.error(message)
@@ -321,8 +322,30 @@ class SiyaVoiceService : Service() {
         turnTimeout = null
     }
 
+    private fun estimateTtsGuardMs(text: String): Long {
+        return (1_200L + text.length.coerceAtMost(180) * 110L).coerceAtMost(21_000L)
+    }
+
+    private fun guardVadDuringTts(text: String) {
+        val until = System.currentTimeMillis() + estimateTtsGuardMs(text)
+        if (until > suppressVadUntilMs) suppressVadUntilMs = until
+    }
+
+    private fun speakResponse(text: String) {
+        if (text.isBlank()) return
+        guardVadDuringTts(text)
+        tts?.speak(text)
+    }
+
+    private fun speakStreamChunk(text: String) {
+        if (text.isBlank()) return
+        guardVadDuringTts(text)
+        tts?.streamChunk(text)
+    }
+
     private fun onPcm(buffer: ShortArray, length: Int) {
         if (length <= 0) return
+        if (System.currentTimeMillis() < suppressVadUntilMs) return
         val handler = vadHandler ?: return
         val copy = buffer.copyOf(length)
         // Keep audio append + VAD event handling on the same serial worker.
@@ -340,9 +363,6 @@ class SiyaVoiceService : Service() {
                         VadEventType.SPEECH_START -> {
                             VoiceSessionState.interrupting()
                             cancelTurnTimeout()
-                            // Cancel every previous turn, including a pending ASR job.
-                            // This is the critical barge-in path: old work must not be
-                            // allowed to answer after the user has started a new turn.
                             llmExecutor?.cancelCurrent()
                             sttPipeline?.cancelPending()
                             tts?.stop()
