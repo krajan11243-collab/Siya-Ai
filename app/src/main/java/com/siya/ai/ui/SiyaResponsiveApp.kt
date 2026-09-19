@@ -2,6 +2,7 @@ package com.siya.ai.ui
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -54,6 +55,7 @@ import com.siya.ai.llm.LlmModelInstaller
 import com.siya.ai.llm.LlmModelStore
 import com.siya.ai.llm.LocalLlmEngine
 import com.siya.ai.service.VoiceSessionState
+import com.siya.ai.service.VoiceDiagnostics
 import com.siya.ai.service.TtsModelStore
 import com.siya.ai.service.VoiceModelInstaller
 import com.siya.ai.stt.SttModelStore
@@ -107,7 +109,8 @@ fun SiyaResponsiveApp(
                         "allModels" -> AllModels(onBack = { page = "models" })
                         "speech" -> SpeechModels(onBack = { page = "models" })
                         "import" -> ImportModelPage(onBack = { page = "models" })
-                        "settings" -> ResponsiveSettings(onBack = { page = "home" }, onChat = { page = "chat" }, onModels = { page = "models" })
+                        "settings" -> ResponsiveSettings(onBack = { page = "home" }, onChat = { page = "chat" }, onModels = { page = "models" }, onDiagnostics = { page = "diagnostics" })
+                        "diagnostics" -> VoiceDiagnosticsPage(onBack = { page = "settings" })
                         else -> PixelHome(
                     microphoneGranted = microphoneGranted,
                     voice = voice,
@@ -1251,13 +1254,14 @@ private fun ResponsiveChat(onBack: () -> Unit, onModels: () -> Unit) {
 }
 
 @Composable
-private fun ResponsiveSettings(onBack: () -> Unit, onChat: () -> Unit, onModels: () -> Unit) {
+private fun ResponsiveSettings(onBack: () -> Unit, onChat: () -> Unit, onModels: () -> Unit, onDiagnostics: () -> Unit) {
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).verticalScroll(rememberScrollState()).padding(20.dp)) {
         PageHeader("Settings", onBack)
         Spacer(Modifier.height(12.dp))
         SettingCard("Chat", "Offline text chat with Local LLM", Icons.Default.ChatBubble, onChat)
         SettingCard("AI Models", "Download or import offline models", Icons.Default.Memory, onModels)
         SettingCard("Voice mode", "Voice-first assistant", Icons.Default.Mic, null)
+        SettingCard("Voice Diagnostics", "Live MIC → VAD → STT → LLM → TTS event log", Icons.Default.BugReport, onDiagnostics)
         SettingCard("Privacy", "On-device processing", Icons.Default.Lock, null)
         SettingCard("Language", "Hindi / Hinglish / English", Icons.Default.Language, null)
         SettingCard("Background", "Controlled by Android permissions", Icons.Default.BatterySaver, null)
@@ -1318,6 +1322,126 @@ private fun SettingCard(title: String, subtitle: String, icon: androidx.compose.
             Surface(Modifier.size(43.dp), RoundedCornerShape(13.dp), Panel2) { Icon(icon, null, tint = if (title == "AI Models") Cyan else Purple, modifier = Modifier.padding(10.dp)) }
             Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(text = title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold); Text(text = subtitle, color = Muted, fontSize = 10.sp) }
             if (onClick != null) Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Muted)
+        }
+    }
+}
+
+@Composable
+private fun VoiceDiagnosticsPage(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val events by VoiceDiagnostics.events.collectAsState()
+
+    Column(
+        Modifier.fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(16.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(54.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Voice Diagnostics", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                Text("Live pipeline event monitor • ${events.size} events", color = Cyan, fontSize = 9.sp)
+            }
+            TextButton(onClick = { VoiceDiagnostics.clear() }) {
+                Text("CLEAR", color = Purple, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Surface(
+            Modifier.fillMaxWidth().padding(vertical = 7.dp),
+            RoundedCornerShape(16.dp),
+            Panel,
+            border = BorderStroke(1.dp, Cyan.copy(.35f))
+        ) {
+            Column(Modifier.padding(13.dp)) {
+                Text("MIC → VAD → STT → LLM → TTS → SPEAKER", color = White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Test from Home, then return here. Errors and replies are logged automatically.",
+                    color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 5.dp)
+                )
+            }
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Button(
+                onClick = {
+                    val share = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Siya Ai Voice Diagnostics")
+                        putExtra(Intent.EXTRA_TEXT, VoiceDiagnostics.exportText(context))
+                    }
+                    context.startActivity(Intent.createChooser(share, "Share Siya voice log"))
+                },
+                modifier = Modifier.weight(1f).height(45.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Purple),
+                shape = RoundedCornerShape(13.dp)
+            ) {
+                Icon(Icons.Default.Share, null, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("SHARE LOG", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                onClick = {
+                    VoiceDiagnostics.log("UI", "DIAGNOSTIC_TEST", "screen opened")
+                },
+                modifier = Modifier.weight(1f).height(45.dp),
+                shape = RoundedCornerShape(13.dp)
+            ) {
+                Icon(Icons.Default.Refresh, null, tint = Cyan, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("MARK TEST", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        if (events.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.BugReport, null, tint = Cyan, modifier = Modifier.size(42.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("No events yet", color = White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("Tap the microphone on Home and test your voice.", color = Muted, fontSize = 10.sp)
+                }
+            }
+        } else {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 5.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                items(events.asReversed()) { event ->
+                    Surface(
+                        Modifier.fillMaxWidth(),
+                        RoundedCornerShape(11.dp),
+                        Panel,
+                        border = BorderStroke(1.dp, Color.White.copy(.035f))
+                    ) {
+                        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(event.time, color = Muted, fontSize = 8.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(event.stage, color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(6.dp))
+                                Text(event.event, color = White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            if (event.detail.isNotBlank()) {
+                                Text(
+                                    event.detail,
+                                    color = Muted,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.padding(top = 3.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
