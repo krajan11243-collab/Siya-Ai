@@ -1,0 +1,75 @@
+name: Build Siya AI APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Siya.AI.zip'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract project archive
+        run: |
+          set -e
+          mkdir -p source
+          ZIP="$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1)"
+          test -n "$ZIP" || { echo "No project ZIP found"; exit 1; }
+          unzip -q "$ZIP" -d source
+          echo "Extracted $ZIP"
+          find source -maxdepth 4 -type f | head -200
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=source
+          FLUTTER_DIR="$(find "$ROOT" -type f -name pubspec.yaml -printf '%h\n' | head -n 1 || true)"
+          GRADLE_DIR="$(find "$ROOT" -type f -name gradlew -printf '%h\n' | head -n 1 || true)"
+          if [ -n "$FLUTTER_DIR" ]; then
+            cd "$FLUTTER_DIR"
+            flutter pub get
+            flutter build apk --release
+            mkdir -p "$GITHUB_WORKSPACE/output"
+            cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/output/Siya-AI-release.apk"
+          elif [ -n "$GRADLE_DIR" ]; then
+            cd "$GRADLE_DIR"
+            chmod +x ./gradlew
+            ./gradlew assembleRelease --no-daemon
+            APK="$(find . -type f -path '*/build/outputs/apk/*/release/*.apk' | head -n 1)"
+            test -n "$APK" || { echo "Gradle completed but no release APK found"; exit 1; }
+            mkdir -p "$GITHUB_WORKSPACE/output"
+            cp "$APK" "$GITHUB_WORKSPACE/output/Siya-AI-release.apk"
+          else
+            echo "Unsupported or incomplete project: neither pubspec.yaml nor gradlew found in ZIP."
+            exit 1
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Siya-AI-release-apk
+          path: output/Siya-AI-release.apk
+          if-no-files-found: error
+          retention-days: 14
