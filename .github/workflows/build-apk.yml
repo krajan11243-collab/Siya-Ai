@@ -26,7 +26,7 @@ jobs:
           test -n "$ZIP" || { echo "No project ZIP found"; exit 1; }
           unzip -q "$ZIP" -d source
           echo "Extracted $ZIP"
-          find source -maxdepth 4 -type f | head -200
+          find source -maxdepth 5 -type f | head -250
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -34,10 +34,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Set up compatible Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.29.3'
           cache: true
 
       - name: Build APK
@@ -49,6 +49,10 @@ jobs:
           GRADLE_DIR="$(find "$ROOT" -type f -name gradlew -printf '%h\n' | head -n 1 || true)"
           if [ -n "$FLUTTER_DIR" ]; then
             cd "$FLUTTER_DIR"
+            echo "Flutter project: $PWD"
+            echo "Gradle wrapper:"
+            grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties || true
+            flutter doctor -v
             flutter pub get
             flutter build apk --release
             mkdir -p "$GITHUB_WORKSPACE/output"
