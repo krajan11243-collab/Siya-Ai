@@ -1,77 +1,55 @@
 name: Build Siya AI APK
-
 on:
   push:
     branches: [main]
-    paths:
-      - 'Siya.AI.zip'
-      - '.github/workflows/build-apk.yml'
+    paths: ['Siya.AI.zip', '.github/workflows/build-apk.yml']
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Extract project archive
         run: |
           set -e
           mkdir -p source
           ZIP="$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1)"
-          test -n "$ZIP" || { echo "No project ZIP found"; exit 1; }
+          test -n "$ZIP"
           unzip -q "$ZIP" -d source
-          echo "Extracted $ZIP"
           find source -maxdepth 5 -type f | head -250
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Set up compatible Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.29.3'
           cache: true
-
+      - name: Patch Android SDK compatibility
+        run: |
+          set -eux
+          # Media3 1.5.1 requires compileSdk 35. Upgrade project AGP where declared.
+          find source -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) -print0 | while IFS= read -r -d '' f; do
+            sed -i -E 's/(com\.android\.application["'\'' ]*version[ "'\''=:]+)8\.4\.0/\18.6.1/g' "$f" || true
+            sed -i -E 's/(com\.android\.tools\.build:gradle:)8\.4\.0/\18.6.1/g' "$f" || true
+            sed -i -E 's/compileSdk(Version)?[ =]+34/compileSdk\1 = 35/g' "$f" || true
+          done
+          grep -RInE 'compileSdk|com.android.application|com.android.tools.build:gradle' source --include='*.gradle' --include='*.gradle.kts' || true
       - name: Build APK
         shell: bash
         run: |
           set -euo pipefail
-          ROOT=source
-          FLUTTER_DIR="$(find "$ROOT" -type f -name pubspec.yaml -printf '%h\n' | head -n 1 || true)"
-          GRADLE_DIR="$(find "$ROOT" -type f -name gradlew -printf '%h\n' | head -n 1 || true)"
-          if [ -n "$FLUTTER_DIR" ]; then
-            cd "$FLUTTER_DIR"
-            echo "Flutter project: $PWD"
-            echo "Gradle wrapper:"
-            grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties || true
-            flutter doctor -v
-            flutter pub get
-            flutter build apk --release
-            mkdir -p "$GITHUB_WORKSPACE/output"
-            cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/output/Siya-AI-release.apk"
-          elif [ -n "$GRADLE_DIR" ]; then
-            cd "$GRADLE_DIR"
-            chmod +x ./gradlew
-            ./gradlew assembleRelease --no-daemon
-            APK="$(find . -type f -path '*/build/outputs/apk/*/release/*.apk' | head -n 1)"
-            test -n "$APK" || { echo "Gradle completed but no release APK found"; exit 1; }
-            mkdir -p "$GITHUB_WORKSPACE/output"
-            cp "$APK" "$GITHUB_WORKSPACE/output/Siya-AI-release.apk"
-          else
-            echo "Unsupported or incomplete project: neither pubspec.yaml nor gradlew found in ZIP."
-            exit 1
-          fi
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+          FLUTTER_DIR="$(find source -type f -name pubspec.yaml -printf '%h\n' | head -n 1 || true)"
+          if [ -z "$FLUTTER_DIR" ]; then echo "No Flutter pubspec.yaml found"; exit 1; fi
+          cd "$FLUTTER_DIR"
+          flutter doctor -v
+          flutter pub get
+          flutter build apk --release
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/output/Siya-AI-release.apk"
+      - uses: actions/upload-artifact@v4
         with:
           name: Siya-AI-release-apk
           path: output/Siya-AI-release.apk
